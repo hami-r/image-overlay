@@ -20,6 +20,16 @@ import { generateBackgroundImage } from '@/ai/flows/generate-background-image';
 import { Switch } from './ui/switch';
 import { Slider } from './ui/slider';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 const exampleJson = [
   {
@@ -93,7 +103,7 @@ const URLBackgroundInput = ({ index, onSetUrl }: { index: number, onSetUrl: (url
     )
 }
 
-const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground, onImageUpload, onImageUrl, onAiGenerateImage, generatingAiImageIndex }: { 
+const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground, onImageUpload, onImageUrl, onAiGenerateImage, generatingAiImageIndex, onApplyStylesToAll }: { 
     config: any, 
     index: number, 
     onConfigChange: (field: string, value: any) => void, 
@@ -102,7 +112,8 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
     onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void,
     onImageUrl: (url: string) => void,
     onAiGenerateImage: (prompt: string) => void,
-    generatingAiImageIndex: number | null
+    generatingAiImageIndex: number | null,
+    onApplyStylesToAll: () => void
 }) => {
     const isGeneratingThis = generatingAiImageIndex === index;
     return (
@@ -258,10 +269,15 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
                         </AccordionItem>
                     </Accordion>
 
+                    <div className="flex gap-2 pt-4">
+                        <Button variant="outline" size="sm" onClick={onRemove}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Remove
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={onApplyStylesToAll}>
+                            <Copy className="mr-2 h-4 w-4" /> Apply to All
+                        </Button>
+                    </div>
 
-                    <Button variant="outline" size="sm" onClick={onRemove}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Remove Image
-                    </Button>
                     </div>
             </AccordionContent>
         </AccordionItem>
@@ -283,6 +299,10 @@ export function BatchEditor() {
     const [globalWidth, setGlobalWidth] = useState(1280);
     const [globalHeight, setGlobalHeight] = useState(720);
     const [globalTextColor, setGlobalTextColor] = useState("#000000");
+
+    // State for "Apply styles from item"
+    const [applyStylesDialogOpen, setApplyStylesDialogOpen] = useState(false);
+    const [styleSourceIndex, setStyleSourceIndex] = useState<number | null>(null);
 
     const { toast } = useToast();
 
@@ -744,6 +764,41 @@ export function BatchEditor() {
         });
     }
 
+    const openApplyStylesDialog = (index: number) => {
+        setStyleSourceIndex(index);
+        setApplyStylesDialogOpen(true);
+    };
+
+    const applyStylesToAll = (includeBackground: boolean) => {
+        if (styleSourceIndex === null) return;
+
+        const sourceConfig = configs[styleSourceIndex];
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { text, ...sourceStyles } = sourceConfig;
+
+        if (!includeBackground) {
+            delete sourceStyles.background;
+            delete sourceStyles.backgroundImage;
+        }
+
+        const newConfigs = configs.map((config, index) => {
+            if (index === styleSourceIndex) {
+                return config;
+            }
+            return {
+                ...config,
+                ...sourceStyles,
+            };
+        });
+
+        setConfigs(newConfigs);
+        toast({
+            title: 'Styles Applied',
+            description: `Applied styles from image ${styleSourceIndex + 1} to all other images.`,
+        });
+    };
+
+
     const renderPreview = (config: any, index: number) => {
          const {
             text = "Missing Text",
@@ -869,6 +924,7 @@ export function BatchEditor() {
                         onImageUrl={(url) => handleImageUrl(index, url)}
                         onAiGenerateImage={(prompt) => handleAiGenerateImage(index, prompt)}
                         generatingAiImageIndex={generatingAiImageIndex}
+                        onApplyStylesToAll={() => openApplyStylesDialog(index)}
                     />
                 ))}
             </Accordion>
@@ -955,8 +1011,30 @@ export function BatchEditor() {
                     </div>
                 </div>
             )}
+
+            <AlertDialog open={applyStylesDialogOpen} onOpenChange={setApplyStylesDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                    <AlertDialogTitle>Apply Styles to All Images?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This will apply all styles from Image {styleSourceIndex !== null ? styleSourceIndex + 1 : ''} to all other images. The text content will not be changed.
+                    </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => applyStylesToAll(false)}>
+                        Apply Styles Only
+                    </AlertDialogAction>
+                    <AlertDialogAction onClick={() => applyStylesToAll(true)}>
+                        Apply Styles & Background
+                    </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
+
+    
 
     

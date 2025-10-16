@@ -4,8 +4,11 @@ import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Code, Bot, AlertTriangle } from 'lucide-react';
+import { Code, Bot, AlertTriangle, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { generateBatchJson } from '@/ai/flows/generate-batch-json';
 
 const exampleJson = [
   {
@@ -27,7 +30,9 @@ export function BatchEditor() {
     const [jsonInput, setJsonInput] = useState(JSON.stringify(exampleJson, null, 2));
     const [configs, setConfigs] = useState<any[]>(exampleJson);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isGeneratingJson, setIsGeneratingJson] = useState(false);
     const [jsonError, setJsonError] = useState<string | null>(null);
+    const [aiPrompt, setAiPrompt] = useState('Create 3 images for a motivational social media post');
     const { toast } = useToast();
 
     useEffect(() => {
@@ -41,12 +46,12 @@ export function BatchEditor() {
                 setConfigs([]);
             }
         } catch (error: any) {
-            setJsonError(error.message);
+            setJsonError("Invalid JSON. " + error.message);
             setConfigs([]);
         }
     }, [jsonInput]);
 
-    const handleGenerate = async () => {
+    const handleGenerateImages = async () => {
         if (jsonError) {
              toast({
                 variant: "destructive",
@@ -78,8 +83,44 @@ export function BatchEditor() {
 
         setIsGenerating(false);
     };
+    
+    const handleGenerateJson = async () => {
+        if (!aiPrompt.trim()) {
+            toast({
+                variant: "destructive",
+                title: "Prompt is empty",
+                description: "Please enter a prompt to generate the JSON.",
+            });
+            return;
+        }
 
-    const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
+        setIsGeneratingJson(true);
+        try {
+            const result = await generateBatchJson({ prompt: aiPrompt });
+            // Attempt to parse to ensure it's valid before setting
+            JSON.parse(result.json);
+            setJsonInput(result.json);
+            toast({
+                title: "JSON Generated",
+                description: "The JSON has been updated with the AI's response.",
+            });
+        } catch (error: any) {
+            console.error("AI JSON Generation Error:", error);
+            const description = error.message.includes('JSON.parse')
+                ? "The AI returned invalid JSON. Please try again."
+                : error.message || "An unknown error occurred.";
+            toast({
+                variant: "destructive",
+                title: "AI Generation Failed",
+                description: description,
+            });
+        } finally {
+            setIsGeneratingJson(false);
+        }
+    };
+
+    const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
+        if (!text) return [];
         const words = text.split(' ');
         let lines: string[] = [];
         let currentLine = words[0] || '';
@@ -135,6 +176,8 @@ export function BatchEditor() {
                         gradient.addColorStop(1, colors[1]);
                         ctx.fillStyle = gradient;
                     }
+                } else {
+                    ctx.fillStyle = background;
                 }
             } else {
                  ctx.fillStyle = background;
@@ -154,11 +197,8 @@ export function BatchEditor() {
             const lines = manualLines.flatMap((line: string) => wrapText(ctx, line, maxTextWidth));
 
             const lineHeight = fontSize * 1.2;
-            const totalTextHeight = (lines.length) * lineHeight;
-            let startY = (height - totalTextHeight) / 2 + (lineHeight/2);
-            if (lines.length > 1) {
-                startY -= (lineHeight * (lines.length - 1)) / 2
-            }
+            const totalTextHeight = (lines.length - 1) * lineHeight;
+            let startY = (height - totalTextHeight) / 2;
 
 
             lines.forEach((line: string, lineIndex: number) => {
@@ -222,19 +262,42 @@ export function BatchEditor() {
 
     return (
         <div className="space-y-6">
+            <div className="space-y-4 p-4 border rounded-lg bg-card-foreground/5">
+                 <Label htmlFor="ai-prompt">Generate with AI</Label>
+                 <Input 
+                    id="ai-prompt"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="e.g., Create 5 images for a coffee shop promotion"
+                    disabled={isGeneratingJson || isGenerating}
+                 />
+                 <p className="text-xs text-muted-foreground">Describe the set of images you want to create. The AI will generate the JSON for you.</p>
+                 <Button onClick={handleGenerateJson} disabled={isGeneratingJson || isGenerating} className="w-full">
+                     {isGeneratingJson ? (
+                        <>
+                            <Bot className="mr-2 h-4 w-4 animate-spin" />
+                            Generating JSON...
+                        </>
+                    ) : (
+                        <>
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Generate JSON with AI
+                        </>
+                    )}
+                 </Button>
+            </div>
             <div>
-                <p className="text-sm text-muted-foreground mb-2">
-                    Define image properties like `text`, `textColor`, `fontSize`, `fontFamily`, `textAlign`, `background`, `width`, and `height`.
-                    All properties are optional. See the example below.
-                </p>
+                <Label className="text-sm text-muted-foreground mb-2 block">
+                    JSON Configuration
+                </Label>
                 <div className="relative">
                     <Textarea
                         value={jsonInput}
                         onChange={(e) => setJsonInput(e.target.value)}
                         placeholder='[ { "text": "My First Image" } ]'
                         rows={15}
-                        className="font-code text-sm"
-                        disabled={isGenerating}
+                        className="font-mono text-sm"
+                        disabled={isGenerating || isGeneratingJson}
                     />
                     <Code className="absolute top-3 right-3 text-muted-foreground" />
                 </div>
@@ -249,16 +312,16 @@ export function BatchEditor() {
                 )}
             </div>
 
-            <Button onClick={handleGenerate} disabled={isGenerating || !!jsonError}>
+            <Button onClick={handleGenerateImages} disabled={isGenerating || !!jsonError || isGeneratingJson}>
                 {isGenerating ? (
                     <>
                         <Bot className="mr-2 h-4 w-4 animate-spin" />
-                        Generating...
+                        Generating Images...
                     </>
                 ) : "Generate Images"}
             </Button>
             
-            {configs.length > 0 && (
+            {configs.length > 0 && !jsonError && (
                 <div className="space-y-8">
                      <h3 className="text-xl font-semibold">Previews</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

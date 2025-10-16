@@ -17,6 +17,8 @@ import { backgroundPatterns } from '@/lib/backgrounds';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { generateBackgroundImage } from '@/ai/flows/generate-background-image';
+import { Switch } from './ui/switch';
+import { Slider } from './ui/slider';
 
 const exampleJson = [
   {
@@ -205,7 +207,15 @@ export function BatchEditor() {
                 background = "#FFFFFF",
                 backgroundImage,
                 width = 1280,
-                height = 720
+                height = 720,
+                letterSpacing = 0,
+                addTextShadow = false,
+                textShadowColor = 'rgba(0,0,0,0.5)',
+                textShadowBlur = 10,
+                textShadowOffsetX = 5,
+                textShadowOffsetY = 5,
+                textStrokeWidth = 0,
+                textStrokeColor = '#000000',
             } = config;
 
             canvas.width = width;
@@ -265,6 +275,14 @@ export function BatchEditor() {
                 ctx.fillStyle = textColor;
                 ctx.textAlign = textAlign as CanvasTextAlign;
                 ctx.textBaseline = 'middle';
+                ctx.letterSpacing = `${letterSpacing}px`;
+
+                if (addTextShadow) {
+                    ctx.shadowColor = textShadowColor;
+                    ctx.shadowBlur = textShadowBlur;
+                    ctx.shadowOffsetX = textShadowOffsetX;
+                    ctx.shadowOffsetY = textShadowOffsetY;
+                }
 
                 const padding = 80;
                 const maxTextWidth = width - padding;
@@ -281,6 +299,12 @@ export function BatchEditor() {
                         case 'left': x = padding / 2; break;
                         case 'right': x = width - (padding / 2); break;
                         case 'center': default: x = width / 2; break;
+                    }
+                    
+                    if (textStrokeWidth > 0) {
+                        ctx.strokeStyle = textStrokeColor;
+                        ctx.lineWidth = textStrokeWidth;
+                        ctx.strokeText(line, x, y);
                     }
                     ctx.fillText(line, x, y);
                 });
@@ -299,7 +323,7 @@ export function BatchEditor() {
         const newConfigs = [...configs];
         const newConfig = { ...newConfigs[index], [field]: value };
         
-        if (field === "fontSize" || field === "width" || field === "height") {
+        if (["fontSize", "width", "height", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY"].includes(field)) {
             newConfig[field] = Number(value);
         }
 
@@ -430,7 +454,15 @@ export function BatchEditor() {
             background = "#FFFFFF",
             backgroundImage,
             width = 1280,
-            height = 720
+            height = 720,
+            letterSpacing = 0,
+            addTextShadow = false,
+            textShadowColor = 'rgba(0,0,0,0.5)',
+            textShadowBlur = 10,
+            textShadowOffsetX = 5,
+            textShadowOffsetY = 5,
+            textStrokeWidth = 0,
+            textStrokeColor = '#000000',
         } = config;
         
         const backgroundStyle: React.CSSProperties = backgroundImage ? {
@@ -452,6 +484,9 @@ export function BatchEditor() {
             whiteSpace: 'pre-wrap',
             padding: '1rem',
             wordBreak: 'break-word',
+            letterSpacing: `${letterSpacing / 32}rem`,
+            WebkitTextStroke: textStrokeWidth > 0 ? `${textStrokeWidth / 16}rem ${textStrokeColor}` : 'unset',
+            textShadow: addTextShadow ? `${textShadowOffsetX/16}rem ${textShadowOffsetY/16}rem ${textShadowBlur/16}rem ${textShadowColor}` : 'none',
         };
 
         return (
@@ -522,7 +557,7 @@ export function BatchEditor() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label htmlFor={`text-color-${index}`}>Text Color</Label>
-                                            <Input id={`text-color-${index}`} type="color" value={config.textColor} onChange={(e) => handleConfigChange(index, 'textColor', e.target.value)} className="p-1 h-10"/>
+                                            <Input id={`text-color-${index}`} type="color" value={config.textColor || '#000000'} onChange={(e) => handleConfigChange(index, 'textColor', e.target.value)} className="p-1 h-10"/>
                                         </div>
                                     </div>
 
@@ -595,6 +630,69 @@ export function BatchEditor() {
                                             <Input id={`height-${index}`} type="number" value={config.height} onChange={(e) => handleConfigChange(index, 'height', e.target.value)} />
                                         </div>
                                     </div>
+
+                                    {/* Advanced Styling */}
+                                    <Accordion type="single" collapsible className="w-full">
+                                        <AccordionItem value="advanced-style">
+                                            <AccordionTrigger>Advanced Styling</AccordionTrigger>
+                                            <AccordionContent className="space-y-4 pt-4">
+                                                 <div className="space-y-2">
+                                                    <Label>Letter Spacing: {config.letterSpacing || 0}px</Label>
+                                                    <Slider value={[config.letterSpacing || 0]} onValueChange={([val]) => handleConfigChange(index, 'letterSpacing', val)} min={-10} max={50} step={1} />
+                                                </div>
+
+                                                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                                                    <div className="space-y-0.5">
+                                                        <Label>Text Stroke</Label>
+                                                    </div>
+                                                    <Switch checked={config.textStrokeWidth > 0} onCheckedChange={(checked) => handleConfigChange(index, 'textStrokeWidth', checked ? 2 : 0)} />
+                                                </div>
+                                                {config.textStrokeWidth > 0 && (
+                                                    <div className="space-y-4 border p-3 rounded-lg">
+                                                        <div className="space-y-2">
+                                                            <Label>Stroke Width: {config.textStrokeWidth}px</Label>
+                                                            <Slider value={[config.textStrokeWidth]} onValueChange={([val]) => handleConfigChange(index, 'textStrokeWidth', val)} min={0} max={20} step={1} />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor={`text-stroke-color-${index}`}>Stroke Color</Label>
+                                                            <Input id={`text-stroke-color-${index}`} type="color" value={config.textStrokeColor || '#000000'} onChange={(e) => handleConfigChange(index, 'textStrokeColor', e.target.value)} className="p-1 h-10"/>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                                                    <div className="space-y-0.5">
+                                                        <Label>Text Shadow</Label>
+                                                    </div>
+                                                    <Switch checked={config.addTextShadow} onCheckedChange={(checked) => handleConfigChange(index, 'addTextShadow', checked)} />
+                                                </div>
+                                                {config.addTextShadow && (
+                                                    <div className="space-y-4 border p-3 rounded-lg">
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor={`text-shadow-color-${index}`}>Shadow Color</Label>
+                                                            <Input id={`text-shadow-color-${index}`} type="color" value={config.textShadowColor || '#000000'} onChange={(e) => handleConfigChange(index, 'textShadowColor', e.target.value)} className="p-1 h-10"/>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label>Shadow Blur: {config.textShadowBlur || 10}px</Label>
+                                                            <Slider value={[config.textShadowBlur || 10]} onValueChange={([val]) => handleConfigChange(index, 'textShadowBlur', val)} min={0} max={50} step={1} />
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div className="space-y-2">
+                                                                <Label>Offset X: {config.textShadowOffsetX || 5}px</Label>
+                                                                <Slider value={[config.textShadowOffsetX || 5]} onValueChange={([val]) => handleConfigChange(index, 'textShadowOffsetX', val)} min={-20} max={20} step={1} />
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <Label>Offset Y: {config.textShadowOffsetY || 5}px</Label>
+                                                                <Slider value={[config.textShadowOffsetY || 5]} onValueChange={([val]) => handleConfigChange(index, 'textShadowOffsetY', val)} min={-20} max={20} step={1} />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    </Accordion>
+
+
                                     <Button variant="outline" size="sm" onClick={() => handleRemoveImage(index)}>
                                         <Trash2 className="mr-2 h-4 w-4" /> Remove Image
                                     </Button>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Code, Bot, AlertTriangle, Sparkles, Trash2, PlusCircle, FormInput, Shuffle, Upload, Link } from 'lucide-react';
+import { Code, Bot, AlertTriangle, Sparkles, Trash2, PlusCircle, FormInput, Shuffle, Upload, Link, Copy } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +19,7 @@ import { AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { generateBackgroundImage } from '@/ai/flows/generate-background-image';
 import { Switch } from './ui/switch';
 import { Slider } from './ui/slider';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
 const exampleJson = [
   {
@@ -275,6 +276,14 @@ export function BatchEditor() {
     const [jsonError, setJsonError] = useState<string | null>(null);
     const [aiPrompt, setAiPrompt] = useState('Create 3 images for a motivational social media post');
     const [generatingAiImageIndex, setGeneratingAiImageIndex] = useState<number | null>(null);
+    
+    // State for "Apply to All"
+    const [globalBackground, setGlobalBackground] = useState('');
+    const [globalFontFamily, setGlobalFontFamily] = useState('');
+    const [globalWidth, setGlobalWidth] = useState(1280);
+    const [globalHeight, setGlobalHeight] = useState(720);
+    const [globalTextColor, setGlobalTextColor] = useState("#000000");
+
     const { toast } = useToast();
 
     useEffect(() => {
@@ -454,23 +463,20 @@ export function BatchEditor() {
             canvas.height = height;
 
             const drawBackground = new Promise<void>((resolve) => {
-                if (backgroundImage) {
-                    const img = new Image();
-                    img.crossOrigin = "anonymous";
-                    img.onload = () => {
-                        ctx.drawImage(img, 0, 0, width, height);
-                        resolve();
-                    };
-                    img.onerror = () => {
-                        console.error(`Failed to load background image for item ${index}: ${backgroundImage}`);
-                        // Fallback to solid color
-                        ctx.fillStyle = background || '#FFFFFF';
-                        ctx.fillRect(0, 0, width, height);
-                        resolve();
-                    };
-                    img.src = backgroundImage;
-                } else {
-                    if (background.includes('gradient')) {
+                // Clear canvas with a neutral color first
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, width, height);
+
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve();
+                };
+                img.onerror = () => {
+                    console.error(`Failed to load background image for item ${index}: ${backgroundImage}`);
+                    // Draw color/gradient background if image fails
+                     if (background.includes('gradient')) {
                          const colors = background.match(/#(?:[0-9a-fA-F]{3}){1,2}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)|hsl\(\s*\d+\s*,\s*[\d.]+\%\s*,\s*[\d.]+\%\s*\)/g);
                         if(colors && colors.length >= 2) {
                             const directionMatch = background.match(/to (right|left|bottom|top|bottom right|bottom left|top left|top right)/);
@@ -505,6 +511,12 @@ export function BatchEditor() {
                     }
                     ctx.fillRect(0, 0, width, height);
                     resolve();
+                };
+
+                if (backgroundImage) {
+                    img.src = backgroundImage;
+                } else {
+                    img.onerror(); // Trigger fallback if no image src
                 }
             });
 
@@ -714,6 +726,24 @@ export function BatchEditor() {
         handleConfigChange(index, 'background', newBackground);
     }
 
+    const handleApplyToAll = (field: string, value: any) => {
+        let newConfigs = configs.map(config => {
+            let newConfig = { ...config, [field]: value };
+            if (field === 'background' && value) {
+                delete newConfig.backgroundImage;
+            }
+            if (field === 'width' || field === 'height') {
+                 newConfig[field] = Number(value);
+            }
+            return newConfig;
+        });
+        setConfigs(newConfigs);
+        toast({
+            title: "Applied to All",
+            description: `Set ${field} for all ${configs.length} images.`,
+        });
+    }
+
     const renderPreview = (config: any, index: number) => {
          const {
             text = "Missing Text",
@@ -776,6 +806,56 @@ export function BatchEditor() {
 
     const renderForm = () => (
         <div className="space-y-4">
+             <Card>
+                <CardHeader>
+                    <CardTitle>Apply to All</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Background</Label>
+                        <div className="flex gap-2">
+                            <Input value={globalBackground} onChange={e => setGlobalBackground(e.target.value)} placeholder="e.g., #FFFFFF or linear-gradient(...)"/>
+                            <Button onClick={() => handleApplyToAll('background', globalBackground)}>Apply</Button>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Font Family</Label>
+                        <div className="flex gap-2">
+                            <Select value={globalFontFamily} onValueChange={setGlobalFontFamily}>
+                                <SelectTrigger><SelectValue placeholder="Select a font" /></SelectTrigger>
+                                <SelectContent>
+                                    {fontFamilies.map(f => <SelectItem key={f.name} value={f.family} style={{fontFamily: f.family}}>{f.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Button onClick={() => handleApplyToAll('fontFamily', globalFontFamily)}>Apply</Button>
+                        </div>
+                    </div>
+                     <div className="space-y-2">
+                        <Label>Text Color</Label>
+                        <div className="flex gap-2">
+                            <Input type="color" value={globalTextColor} onChange={e => setGlobalTextColor(e.target.value)} className="p-1 h-10"/>
+                            <Button onClick={() => handleApplyToAll('textColor', globalTextColor)}>Apply</Button>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Width</Label>
+                            <div className="flex gap-2">
+                                <Input type="number" value={globalWidth} onChange={e => setGlobalWidth(Number(e.target.value))}/>
+                                <Button onClick={() => handleApplyToAll('width', globalWidth)}>Apply</Button>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Height</Label>
+                            <div className="flex gap-2">
+                                <Input type="number" value={globalHeight} onChange={e => setGlobalHeight(Number(e.target.value))}/>
+                                <Button onClick={() => handleApplyToAll('height', globalHeight)}>Apply</Button>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
             <Accordion type="multiple" defaultValue={['item-0']} className="w-full">
                 {configs.map((config, index) => (
                     <BatchItem
@@ -878,3 +958,5 @@ export function BatchEditor() {
         </div>
     );
 }
+
+    

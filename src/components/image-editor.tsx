@@ -174,7 +174,7 @@ export function ImageEditor() {
       } else {
         ctx.fillStyle = background.includes('gradient') ? '#F0F0F0' : background;
         if(background.includes('gradient')) {
-            const colors = background.match(/#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})/g);
+            const colors = background.match(/#(?:[0-9a-fA-F]{3}){1,2}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)|hsl\(\s*\d+\s*,\s*[\d.]+\%\s*,\s*[\d.]+\%\s*\)/g);
             if (colors && colors.length >= 2) {
                 const directionMatch = background.match(/to (right|left|bottom|top)/);
                 const direction = directionMatch ? directionMatch[1] : 'right';
@@ -259,9 +259,19 @@ export function ImageEditor() {
   };
 
   const handleRandomBackground = () => {
-    const randomIndex = Math.floor(Math.random() * backgroundPatterns.length);
-    const randomBg = backgroundPatterns[randomIndex].value;
-    setBackground(randomBg);
+    const randomHue = () => Math.floor(Math.random() * 360);
+    const randomPastel = () => `hsl(${randomHue()}, 70%, 85%)`;
+    
+    let newBackground;
+    if (Math.random() > 0.4) { // 60% chance for gradient
+        const directions = ['to right', 'to bottom right', 'to bottom', 'to bottom left', 'to left', 'to top left', 'to top', 'to top right'];
+        const randomDirection = directions[Math.floor(Math.random() * directions.length)];
+        newBackground = `linear-gradient(${randomDirection}, ${randomPastel()}, ${randomPastel()})`
+    } else { // 40% chance for solid color
+        newBackground = randomPastel();
+    }
+    
+    setBackground(newBackground);
     setUploadedImage(null);
     setPreviewDim({width: 1280, height: 720});
   }

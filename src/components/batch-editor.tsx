@@ -210,9 +210,9 @@ export function BatchEditor() {
 
             // Draw background
             if (background.includes('gradient')) {
-                 const colors = background.match(/#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})/g);
+                 const colors = background.match(/#(?:[0-9a-fA-F]{3}){1,2}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)|hsl\(\s*\d+\s*,\s*[\d.]+\%\s*,\s*[\d.]+\%\s*\)/g);
                 if(colors && colors.length >= 2) {
-                    const directionMatch = background.match(/to (right|left|bottom|top)/);
+                    const directionMatch = background.match(/to (right|left|bottom|top|bottom right|bottom left|top left|top right)/);
                     const direction = directionMatch ? directionMatch[1] : 'right';
                     let gradient;
 
@@ -222,6 +222,14 @@ export function BatchEditor() {
                         gradient = ctx.createLinearGradient(width, 0, 0, 0);
                     } else if (direction === 'bottom') {
                         gradient = ctx.createLinearGradient(0, 0, 0, height);
+                    } else if (direction === 'bottom right') {
+                        gradient = ctx.createLinearGradient(0, 0, width, height);
+                    } else if (direction === 'bottom left') {
+                        gradient = ctx.createLinearGradient(width, 0, 0, height);
+                    } else if (direction === 'top left') {
+                        gradient = ctx.createLinearGradient(width, height, 0, 0);
+                    } else if (direction === 'top right') {
+                        gradient = ctx.createLinearGradient(0, height, width, 0);
                     } else { // top
                         gradient = ctx.createLinearGradient(0, height, 0, 0);
                     }
@@ -304,8 +312,19 @@ export function BatchEditor() {
     };
 
     const handleRandomBackground = (index: number) => {
-        const randomIndex = Math.floor(Math.random() * backgroundPatterns.length);
-        handleConfigChange(index, 'background', backgroundPatterns[randomIndex].value)
+        const randomHue = () => Math.floor(Math.random() * 360);
+        const randomPastel = () => `hsl(${randomHue()}, 70%, 85%)`;
+        
+        let newBackground;
+        if (Math.random() > 0.4) { // 60% chance for gradient
+            const directions = ['to right', 'to bottom right', 'to bottom', 'to bottom left', 'to left', 'to top left', 'to top', 'to top right'];
+            const randomDirection = directions[Math.floor(Math.random() * directions.length)];
+            newBackground = `linear-gradient(${randomDirection}, ${randomPastel()}, ${randomPastel()})`
+        } else { // 40% chance for solid color
+            newBackground = randomPastel();
+        }
+        
+        handleConfigChange(index, 'background', newBackground);
     }
 
     const renderPreview = (config: any, index: number) => {

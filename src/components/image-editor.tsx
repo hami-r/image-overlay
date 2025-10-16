@@ -13,7 +13,7 @@ import { Slider } from '@/components/ui/slider';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { fontFamilies } from '@/lib/fonts';
 import { backgroundPatterns } from '@/lib/backgrounds';
-import { AlignLeft, AlignCenter, AlignRight, CaseUpper, CaseLower, Pilcrow, Heading1, Upload, Download, Sparkles, Bot } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, CaseUpper, CaseLower, Pilcrow, Heading1, Upload, Download, Sparkles, Bot, Shuffle } from 'lucide-react';
 import { generateBackgroundImage } from '@/ai/flows/generate-background-image';
 import { useToast } from '@/hooks/use-toast';
 
@@ -114,23 +114,37 @@ export function ImageEditor() {
     }
   };
   
-    const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
+    const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
+        if (!text) return [];
         const words = text.split(' ');
         let lines: string[] = [];
-        let currentLine = words[0];
+        let currentLine = words[0] || '';
 
         for (let i = 1; i < words.length; i++) {
             const word = words[i];
             const width = ctx.measureText(currentLine + " " + word).width;
-            if (width < maxWidth) {
+            if (width < maxWidth && !word.includes('\n')) {
                 currentLine += " " + word;
             } else {
-                lines.push(currentLine);
-                currentLine = word;
+                const subWords = word.split('\n');
+                for (let j = 0; j < subWords.length; j++) {
+                    if (j > 0) {
+                        lines.push(currentLine);
+                        currentLine = subWords[j];
+                    } else {
+                        const newWidth = ctx.measureText(currentLine + " " + subWords[j]).width;
+                        if (newWidth < maxWidth) {
+                            currentLine += " " + subWords[j];
+                        } else {
+                            lines.push(currentLine);
+                            currentLine = subWords[j];
+                        }
+                    }
+                }
             }
         }
         lines.push(currentLine);
-        return lines;
+        return lines.flatMap(line => line.split('\n'));
     };
 
   const handleDownload = () => {
@@ -160,13 +174,27 @@ export function ImageEditor() {
       } else {
         ctx.fillStyle = background.includes('gradient') ? '#F0F0F0' : background;
         if(background.includes('gradient')) {
-            const gradient = ctx.createLinearGradient(0, 0, width, 0);
             const colors = background.match(/#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})/g);
-            if(colors && colors.length >= 2) {
+            if (colors && colors.length >= 2) {
+                const directionMatch = background.match(/to (right|left|bottom|top)/);
+                const direction = directionMatch ? directionMatch[1] : 'right';
+                let gradient;
+
+                if (direction === 'right') {
+                    gradient = ctx.createLinearGradient(0, 0, width, 0);
+                } else if (direction === 'left') {
+                    gradient = ctx.createLinearGradient(width, 0, 0, 0);
+                } else if (direction === 'bottom') {
+                    gradient = ctx.createLinearGradient(0, 0, 0, height);
+                } else { // top
+                    gradient = ctx.createLinearGradient(0, height, 0, 0);
+                }
                 gradient.addColorStop(0, colors[0]);
                 gradient.addColorStop(1, colors[1]);
+                ctx.fillStyle = gradient;
+            } else {
+                ctx.fillStyle = '#FFFFFF';
             }
-            ctx.fillStyle = gradient;
         }
         ctx.fillRect(0, 0, width, height);
         resolve();
@@ -229,6 +257,14 @@ export function ImageEditor() {
         link.click();
     });
   };
+
+  const handleRandomBackground = () => {
+    const randomIndex = Math.floor(Math.random() * backgroundPatterns.length);
+    const randomBg = backgroundPatterns[randomIndex].value;
+    setBackground(randomBg);
+    setUploadedImage(null);
+    setPreviewDim({width: 1280, height: 720});
+  }
   
   const backgroundStyle: React.CSSProperties = uploadedImage ? {
     backgroundImage: `url(${uploadedImage})`,
@@ -328,7 +364,13 @@ export function ImageEditor() {
           )}
 
           <div className="space-y-4">
-            <Label>Image Background</Label>
+            <div className="flex justify-between items-center">
+                <Label>Image Background</Label>
+                <Button variant="ghost" size="sm" onClick={handleRandomBackground}>
+                    <Shuffle className="w-4 h-4 mr-2"/>
+                    Random
+                </Button>
+            </div>
             <Tabs defaultValue="pattern">
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="pattern">Color/Pattern</TabsTrigger>

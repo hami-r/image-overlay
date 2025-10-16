@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Code, Bot, AlertTriangle, Sparkles, Trash2, PlusCircle, FormInput } from 'lucide-react';
+import { Code, Bot, AlertTriangle, Sparkles, Trash2, PlusCircle, FormInput, Shuffle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -274,7 +274,7 @@ export function BatchEditor() {
         const newConfigs = [...configs];
         const newConfig = { ...newConfigs[index], [field]: value };
         
-        if (field === "width" || field === "height") {
+        if (field === "fontSize" || field === "width" || field === "height") {
             newConfig[field] = Number(value);
         }
 
@@ -302,6 +302,11 @@ export function BatchEditor() {
         const newConfigs = configs.filter((_, i) => i !== index);
         setConfigs(newConfigs);
     };
+
+    const handleRandomBackground = (index: number) => {
+        const randomIndex = Math.floor(Math.random() * backgroundPatterns.length);
+        handleConfigChange(index, 'background', backgroundPatterns[randomIndex].value)
+    }
 
     const renderPreview = (config: any, index: number) => {
          const {
@@ -362,7 +367,12 @@ export function BatchEditor() {
                                         <Input id={`text-color-${index}`} type="color" value={config.textColor} onChange={(e) => handleConfigChange(index, 'textColor', e.target.value)} className="p-1 h-10"/>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor={`bg-color-${index}`}>Background</Label>
+                                        <div className="flex justify-between items-center">
+                                            <Label htmlFor={`bg-color-${index}`}>Background</Label>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRandomBackground(index)}>
+                                                <Shuffle className="w-4 h-4"/>
+                                            </Button>
+                                        </div>
                                         <Input id={`bg-color-${index}`} value={config.background} onChange={(e) => handleConfigChange(index, 'background', e.target.value)} />
                                          <div className="grid grid-cols-5 gap-1 pt-1">
                                             {backgroundPatterns.map(p => (

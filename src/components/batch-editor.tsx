@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Code, Bot } from 'lucide-react';
+import { Code, Bot, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const exampleJson = [
   {
@@ -24,21 +25,33 @@ const exampleJson = [
 
 export function BatchEditor() {
     const [jsonInput, setJsonInput] = useState(JSON.stringify(exampleJson, null, 2));
+    const [configs, setConfigs] = useState<any[]>(exampleJson);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [jsonError, setJsonError] = useState<string | null>(null);
     const { toast } = useToast();
 
-    const handleGenerate = async () => {
-        let configs;
+    useEffect(() => {
         try {
-            configs = JSON.parse(jsonInput);
-            if (!Array.isArray(configs)) {
-                throw new Error("Input must be a JSON array.");
+            const parsed = JSON.parse(jsonInput);
+            if (Array.isArray(parsed)) {
+                setConfigs(parsed);
+                setJsonError(null);
+            } else {
+                setJsonError("Input must be a JSON array.");
+                setConfigs([]);
             }
         } catch (error: any) {
-            toast({
+            setJsonError(error.message);
+            setConfigs([]);
+        }
+    }, [jsonInput]);
+
+    const handleGenerate = async () => {
+        if (jsonError) {
+             toast({
                 variant: "destructive",
                 title: "Invalid JSON",
-                description: error.message,
+                description: "Please fix the JSON errors before generating images.",
             });
             return;
         }
@@ -108,13 +121,21 @@ export function BatchEditor() {
 
             // Draw background
             if (background.includes('gradient')) {
-                const gradient = ctx.createLinearGradient(0, 0, width, 0);
+                const gradient = ctx.createLinearGradient(0, 0, width, height);
                  const colors = background.match(/#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})/g);
                 if(colors && colors.length >= 2) {
-                    gradient.addColorStop(0, colors[0]);
-                    gradient.addColorStop(1, colors[1]);
+                    const direction = background.match(/to (right|left|bottom|top)/);
+                    if (direction && direction[1] === 'right') {
+                         const gradient = ctx.createLinearGradient(0, 0, width, 0);
+                         gradient.addColorStop(0, colors[0]);
+                         gradient.addColorStop(1, colors[1]);
+                         ctx.fillStyle = gradient;
+                    } else {
+                        gradient.addColorStop(0, colors[0]);
+                        gradient.addColorStop(1, colors[1]);
+                        ctx.fillStyle = gradient;
+                    }
                 }
-                ctx.fillStyle = gradient;
             } else {
                  ctx.fillStyle = background;
             }
@@ -133,8 +154,12 @@ export function BatchEditor() {
             const lines = manualLines.flatMap((line: string) => wrapText(ctx, line, maxTextWidth));
 
             const lineHeight = fontSize * 1.2;
-            const totalTextHeight = (lines.length - 1) * lineHeight;
-            let startY = (height - totalTextHeight) / 2;
+            const totalTextHeight = (lines.length) * lineHeight;
+            let startY = (height - totalTextHeight) / 2 + (lineHeight/2);
+            if (lines.length > 1) {
+                startY -= (lineHeight * (lines.length - 1)) / 2
+            }
+
 
             lines.forEach((line: string, lineIndex: number) => {
                 const y = startY + lineIndex * lineHeight;
@@ -156,24 +181,75 @@ export function BatchEditor() {
         });
     };
 
-    return (
-        <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-                Define image properties like `text`, `textColor`, `fontSize`, `fontFamily`, `textAlign`, `background`, `width`, and `height`.
-                All properties are optional. See the example below.
-            </p>
-            <div className="relative">
-                <Textarea
-                    value={jsonInput}
-                    onChange={(e) => setJsonInput(e.target.value)}
-                    placeholder='[ { "text": "My First Image" } ]'
-                    rows={15}
-                    className="font-code text-sm"
-                    disabled={isGenerating}
-                />
-                <Code className="absolute top-3 right-3 text-muted-foreground" />
+    const renderPreview = (config: any, index: number) => {
+         const {
+            text = "Missing Text",
+            textColor = "#000000",
+            fontSize = 64,
+            fontFamily = "'Inter', sans-serif",
+            textAlign = "center",
+            background = "#FFFFFF",
+            width = 1280,
+            height = 720
+        } = config;
+
+        const backgroundStyle: React.CSSProperties = { background };
+        const textStyle: React.CSSProperties = {
+            color: textColor,
+            fontSize: `${fontSize / 32}rem`,
+            fontFamily: fontFamily,
+            textAlign: textAlign as CanvasTextAlign,
+            lineHeight: 1.2,
+            whiteSpace: 'pre-wrap',
+            padding: '1rem',
+            wordBreak: 'break-word',
+        };
+
+        return (
+            <div key={index} className="flex flex-col gap-2">
+                <p className="text-sm font-medium text-muted-foreground">Preview {index + 1}</p>
+                <div 
+                    className="w-full flex items-center justify-center shadow-lg rounded-md bg-card-foreground/5"
+                    style={{ ...backgroundStyle, aspectRatio: `${width} / ${height}` }}
+                >
+                    <div>
+                        <p style={textStyle}>{text}</p>
+                    </div>
+                </div>
             </div>
-            <Button onClick={handleGenerate} disabled={isGenerating}>
+        )
+    }
+
+    return (
+        <div className="space-y-6">
+            <div>
+                <p className="text-sm text-muted-foreground mb-2">
+                    Define image properties like `text`, `textColor`, `fontSize`, `fontFamily`, `textAlign`, `background`, `width`, and `height`.
+                    All properties are optional. See the example below.
+                </p>
+                <div className="relative">
+                    <Textarea
+                        value={jsonInput}
+                        onChange={(e) => setJsonInput(e.target.value)}
+                        placeholder='[ { "text": "My First Image" } ]'
+                        rows={15}
+                        className="font-code text-sm"
+                        disabled={isGenerating}
+                    />
+                    <Code className="absolute top-3 right-3 text-muted-foreground" />
+                </div>
+                 {jsonError && (
+                    <Alert variant="destructive" className="mt-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Invalid JSON</AlertTitle>
+                        <AlertDescription>
+                            <pre className="text-xs">{jsonError}</pre>
+                        </AlertDescription>
+                    </Alert>
+                )}
+            </div>
+
+            <Button onClick={handleGenerate} disabled={isGenerating || !!jsonError}>
                 {isGenerating ? (
                     <>
                         <Bot className="mr-2 h-4 w-4 animate-spin" />
@@ -181,6 +257,15 @@ export function BatchEditor() {
                     </>
                 ) : "Generate Images"}
             </Button>
+            
+            {configs.length > 0 && (
+                <div className="space-y-8">
+                     <h3 className="text-xl font-semibold">Previews</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {configs.map(renderPreview)}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

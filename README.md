@@ -26,7 +26,7 @@ Each object in the array represents one image and can have the following propert
 | `width`             | `number`                     | `1280`                    | The width of the image in pixels.                                                                       |
 | `height`            | `number`                     | `720`                     | The height of the image in pixels.                                                                      |
 | `background`        | `string`                     | `"#FFFFFF"`               | A CSS color (e.g., `#RRGGBB`, `hsl(...)`) or a `linear-gradient(...)` string for the background.      |
-| `backgroundImage`   | `string`                     | `null`                    | A Data URI for a background image. If provided, this will be drawn on top of the `background` color.  |
+| `backgroundImage`   | `string`                     | `null`                    | A Data URI or a publicly accessible URL for a background image. If provided, this will be drawn on top of the `background` color. |
 | `textColor`         | `string`                     | `"#000000"`               | The color of the text as a hex string.                                                                  |
 | `fontFamily`        | `string`                     | `"'Inter', sans-serif"`   | The font family for the text. Should be a valid CSS `font-family` value.                              |
 | `fontSize`          | `number`                     | `64`                      | The font size in pixels.                                                                                |
@@ -53,6 +53,13 @@ Each object in the array represents one image and can have the following propert
     "height": 720,
     "fontFamily": "'Inter', sans-serif",
     "textAlign": "center"
+  },
+  {
+    "text": "Using an Image URL",
+    "backgroundImage": "https://images.unsplash.com/photo-1554034483-04fda0d3507b?q=80&w=2070",
+    "textColor": "#000000",
+    "fontSize": 80,
+    "addTextShadow": true
   },
   {
     "text": "Batch\nCreation\nRocks!",

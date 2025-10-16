@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Code, Bot, AlertTriangle, Sparkles, Trash2, PlusCircle, FormInput, Shuffle, Upload } from 'lucide-react';
+import { Code, Bot, AlertTriangle, Sparkles, Trash2, PlusCircle, FormInput, Shuffle, Upload, Link } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -224,11 +224,18 @@ export function BatchEditor() {
             const drawBackground = new Promise<void>((resolve) => {
                 if (backgroundImage) {
                     const img = new Image();
+                    img.crossOrigin = "anonymous";
                     img.onload = () => {
                         ctx.drawImage(img, 0, 0, width, height);
                         resolve();
                     };
-                    img.onerror = () => resolve(); // continue even if image fails
+                    img.onerror = () => {
+                        console.error(`Failed to load background image for item ${index}: ${backgroundImage}`);
+                        // Fallback to solid color
+                        ctx.fillStyle = background || '#FFFFFF';
+                        ctx.fillRect(0, 0, width, height);
+                        resolve();
+                    };
                     img.src = backgroundImage;
                 } else {
                     if (background.includes('gradient')) {
@@ -321,7 +328,7 @@ export function BatchEditor() {
 
     const handleConfigChange = (index: number, field: string, value: any) => {
         const newConfigs = [...configs];
-        const newConfig = { ...newConfigs[index], [field]: value };
+        let newConfig = { ...newConfigs[index], [field]: value };
         
         if (["fontSize", "width", "height", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY"].includes(field)) {
             newConfig[field] = Number(value);
@@ -356,6 +363,37 @@ export function BatchEditor() {
             };
             reader.readAsDataURL(file);
         }
+    };
+
+    const handleImageUrl = (index: number, url: string) => {
+        if (!url) {
+            toast({
+                variant: 'destructive',
+                title: 'Invalid URL',
+                description: 'Please enter a valid image URL.',
+            });
+            return;
+        }
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            const newConfigs = [...configs];
+            newConfigs[index] = {
+                ...newConfigs[index],
+                backgroundImage: url,
+                width: img.width,
+                height: img.height,
+            };
+            setConfigs(newConfigs);
+        };
+        img.onerror = () => {
+            toast({
+                variant: 'destructive',
+                title: `Could not load image for item ${index+1}`,
+                description: 'Please check the URL and CORS policy.',
+            });
+        };
+        img.src = url;
     };
     
     const handleAiGenerateImage = async (index: number, prompt: string) => {
@@ -536,12 +574,28 @@ export function BatchEditor() {
         )
     };
 
+    const URLBackgroundInput = ({ index, url, setUrl }: { index: number, url: string, setUrl: (u: string) => void }) => {
+        return (
+             <div className="pt-4 space-y-2">
+                <Label htmlFor={`url-input-${index}`}>Image URL</Label>
+                <div className="flex gap-2">
+                    <Input id={`url-input-${index}`} type="url" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} />
+                    <Button onClick={() => handleImageUrl(index, url)}><Link className="w-4 h-4" /></Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                    Note: Images from other websites may be subject to CORS restrictions.
+                </p>
+            </div>
+        )
+    }
+
 
     const renderForm = () => (
         <div className="space-y-4">
             <Accordion type="multiple" defaultValue={['item-0']} className="w-full">
                 {configs.map((config, index) => {
                     const [itemAiPrompt, setItemAiPrompt] = useState('A beautiful sunset over mountains');
+                    const [itemUrl, setItemUrl] = useState(config.backgroundImage?.startsWith('http') ? config.backgroundImage : '');
                     
                     return (
                         <AccordionItem value={`item-${index}`} key={index}>
@@ -569,9 +623,10 @@ export function BatchEditor() {
                                             </Button>
                                         </div>
                                         <Tabs defaultValue="pattern" className="w-full">
-                                            <TabsList className="grid w-full grid-cols-3">
+                                            <TabsList className="grid w-full grid-cols-4">
                                                 <TabsTrigger value="pattern">Color</TabsTrigger>
                                                 <TabsTrigger value="upload">Upload</TabsTrigger>
+                                                <TabsTrigger value="url">URL</TabsTrigger>
                                                 <TabsTrigger value="ai">AI</TabsTrigger>
                                             </TabsList>
                                             <TabsContent value="pattern" className="pt-4">
@@ -590,6 +645,9 @@ export function BatchEditor() {
                                                    </div>
                                                    <Input id={`image-upload-${index}`} type="file" className="hidden" onChange={(e) => handleImageUpload(index, e)} accept="image/*"/>
                                                 </Label>
+                                            </TabsContent>
+                                            <TabsContent value="url">
+                                                <URLBackgroundInput index={index} url={itemUrl} setUrl={setItemUrl} />
                                             </TabsContent>
                                             <TabsContent value="ai">
                                                 <AIBackgroundGenerator index={index} prompt={itemAiPrompt} setPrompt={setItemAiPrompt} />

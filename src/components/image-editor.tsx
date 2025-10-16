@@ -13,7 +13,7 @@ import { Slider } from '@/components/ui/slider';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { fontFamilies } from '@/lib/fonts';
 import { backgroundPatterns } from '@/lib/backgrounds';
-import { AlignLeft, AlignCenter, AlignRight, CaseUpper, CaseLower, Pilcrow, Heading1, Upload, Download, Sparkles, Bot, Shuffle } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, CaseUpper, CaseLower, Pilcrow, Heading1, Upload, Download, Sparkles, Bot, Shuffle, Link } from 'lucide-react';
 import { generateBackgroundImage } from '@/ai/flows/generate-background-image';
 import { useToast } from '@/hooks/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
@@ -28,7 +28,9 @@ export function ImageEditor() {
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('center');
   const [textCase, setTextCase] = useState<CaseType>('normal');
   const [background, setBackground] = useState(backgroundPatterns[0].value);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [backgroundImageSrc, setBackgroundImageSrc] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState('');
+
   const [addTextBackground, setAddTextBackground] = useState(false);
   const [textBackgroundColor, setTextBackgroundColor] = useState('rgba(0, 0, 0, 0.5)');
   
@@ -74,13 +76,39 @@ export function ImageEditor() {
         const img = new Image();
         img.onload = () => {
           setPreviewDim({ width: img.width, height: img.height });
-          setUploadedImage(result);
+          setBackgroundImageSrc(result);
           setBackground(''); // Deselect any color/pattern
         };
         img.src = result;
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleImageUrl = () => {
+    if (!imageUrl) {
+        toast({
+            variant: 'destructive',
+            title: 'Invalid URL',
+            description: 'Please enter a valid image URL.',
+        });
+        return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+        setPreviewDim({ width: img.width, height: img.height });
+        setBackgroundImageSrc(imageUrl);
+        setBackground('');
+    };
+    img.onerror = () => {
+        toast({
+            variant: 'destructive',
+            title: 'Could not load image',
+            description: 'Please check the URL and ensure the image allows cross-origin access.',
+        });
+    };
+    img.src = imageUrl;
   };
 
   const handleAiGenerate = async () => {
@@ -101,7 +129,7 @@ export function ImageEditor() {
         const img = new Image();
         img.onload = () => {
             setPreviewDim({ width: img.width, height: img.height });
-            setUploadedImage(dataUri);
+            setBackgroundImageSrc(dataUri);
             setBackground(''); // Deselect any color/pattern
         };
         img.onerror = () => {
@@ -174,14 +202,25 @@ export function ImageEditor() {
     canvas.style.height = `${height}px`;
 
     const drawBackground = new Promise<void>((resolve) => {
-      if (uploadedImage) {
+      if (backgroundImageSrc) {
         const img = new Image();
+        img.crossOrigin = "anonymous";
         img.onload = () => {
           ctx.drawImage(img, 0, 0, width, height);
           resolve();
         };
-        img.onerror = () => resolve(); // continue even if image fails
-        img.src = uploadedImage;
+        img.onerror = (e) => {
+            console.error("Error loading image for canvas:", e);
+            toast({
+                variant: 'destructive',
+                title: 'Background Image Error',
+                description: 'Could not load the background image. It might be due to CORS policy. Using a fallback background.',
+            });
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, width, height);
+            resolve();
+        };
+        img.src = backgroundImageSrc;
       } else {
         ctx.fillStyle = background.includes('gradient') ? '#F0F0F0' : background;
         if(background.includes('gradient')) {
@@ -301,12 +340,12 @@ export function ImageEditor() {
     }
     
     setBackground(newBackground);
-    setUploadedImage(null);
+    setBackgroundImageSrc(null);
     setPreviewDim({width: 1280, height: 720});
   }
   
-  const backgroundStyle: React.CSSProperties = uploadedImage ? {
-    backgroundImage: `url(${uploadedImage})`,
+  const backgroundStyle: React.CSSProperties = backgroundImageSrc ? {
+    backgroundImage: `url(${backgroundImageSrc})`,
     backgroundSize: 'contain',
     backgroundRepeat: 'no-repeat',
     backgroundPosition: 'center',
@@ -477,16 +516,16 @@ export function ImageEditor() {
                             </Button>
                         </div>
                         <Tabs defaultValue="pattern">
-                            <TabsList className="grid w-full grid-cols-3">
-                                <TabsTrigger value="pattern">Color/Pattern</TabsTrigger>
+                            <TabsList className="grid w-full grid-cols-4">
+                                <TabsTrigger value="pattern">Color</TabsTrigger>
                                 <TabsTrigger value="upload">Upload</TabsTrigger>
-
-                                <TabsTrigger value="ai">Generate AI</TabsTrigger>
+                                <TabsTrigger value="url">URL</TabsTrigger>
+                                <TabsTrigger value="ai">AI</TabsTrigger>
                             </TabsList>
                             <TabsContent value="pattern" className="pt-4">
                                 <div className="grid grid-cols-5 gap-2">
                                     {backgroundPatterns.map(p => (
-                                        <button key={p.name} title={p.name} onClick={() => { setBackground(p.value); setUploadedImage(null); setPreviewDim({width:1280, height: 720}) }} className={ `w-full h-10 rounded-md border-2 ${ (background === p.value && !uploadedImage) ? 'border-ring' : 'border-transparent'}` } style={{ background: p.value }} />
+                                        <button key={p.name} title={p.name} onClick={() => { setBackground(p.value); setBackgroundImageSrc(null); setPreviewDim({width:1280, height: 720}) }} className={ `w-full h-10 rounded-md border-2 ${ (background === p.value && !backgroundImageSrc) ? 'border-ring' : 'border-transparent'}` } style={{ background: p.value }} />
                                     ))}
                                 </div>
                             </TabsContent>
@@ -500,6 +539,16 @@ export function ImageEditor() {
                                     <Input id="image-upload" type="file" className="hidden" onChange={handleImageUpload} accept="image/*"/>
                                     </Label>
                                 </div>
+                            </TabsContent>
+                            <TabsContent value="url" className="pt-4 space-y-2">
+                                <Label htmlFor="image-url">Image URL</Label>
+                                <div className="flex gap-2">
+                                    <Input id="image-url" type="url" placeholder="https://..." value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
+                                    <Button onClick={handleImageUrl}><Link className="w-4 h-4" /></Button>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Note: Images from other websites may be subject to CORS restrictions.
+                                </p>
                             </TabsContent>
                             <TabsContent value="ai" className="pt-4 space-y-4">
                                 <div className="space-y-2">

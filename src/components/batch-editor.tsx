@@ -43,6 +43,230 @@ const exampleJson = [
   }
 ];
 
+const AIBackgroundGenerator = ({ index, onGenerate, isGenerating }: { index: number, onGenerate: (prompt: string) => void, isGenerating: boolean }) => {
+    const [prompt, setPrompt] = useState('A beautiful sunset over mountains');
+    
+    return (
+        <div className="pt-4 space-y-4">
+            <div className="space-y-2">
+                <Label htmlFor={`ai-prompt-${index}`}>AI Prompt</Label>
+                <Input
+                    id={`ai-prompt-${index}`}
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="e.g., A futuristic cityscape at night"
+                    disabled={isGenerating}
+                />
+                 <p className="text-xs text-muted-foreground">Describe the background you want to generate.</p>
+            </div>
+            <Button onClick={() => onGenerate(prompt)} disabled={isGenerating} className="w-full">
+                {isGenerating ? (
+                    <>
+                        <Bot className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                    </>
+                ) : (
+                    <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Generate Background
+                    </>
+                )}
+            </Button>
+        </div>
+    )
+};
+
+const URLBackgroundInput = ({ index, onSetUrl }: { index: number, onSetUrl: (url: string) => void }) => {
+    const [url, setUrl] = useState('');
+    return (
+         <div className="pt-4 space-y-2">
+            <Label htmlFor={`url-input-${index}`}>Image URL</Label>
+            <div className="flex gap-2">
+                <Input id={`url-input-${index}`} type="url" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} />
+                <Button onClick={() => onSetUrl(url)}><Link className="w-4 h-4" /></Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+                Note: Images from other websites may be subject to CORS restrictions.
+            </p>
+        </div>
+    )
+}
+
+const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground, onImageUpload, onImageUrl, onAiGenerateImage, generatingAiImageIndex }: { 
+    config: any, 
+    index: number, 
+    onConfigChange: (field: string, value: any) => void, 
+    onRemove: () => void,
+    onRandomBackground: () => void,
+    onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void,
+    onImageUrl: (url: string) => void,
+    onAiGenerateImage: (prompt: string) => void,
+    generatingAiImageIndex: number | null
+}) => {
+    const isGeneratingThis = generatingAiImageIndex === index;
+    return (
+        <AccordionItem value={`item-${index}`}>
+            <AccordionTrigger>
+                <span className="truncate">Image {index + 1}: {config.text || "Untitled"}</span>
+            </AccordionTrigger>
+            <AccordionContent>
+                    <div className="space-y-4 p-4 pr-2">
+                    <div className="space-y-2">
+                        <Label htmlFor={`text-${index}`}>Text</Label>
+                        <Textarea id={`text-${index}`} value={config.text} onChange={(e) => onConfigChange('text', e.target.value)} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor={`text-color-${index}`}>Text Color</Label>
+                            <Input id={`text-color-${index}`} type="color" value={config.textColor || '#000000'} onChange={(e) => onConfigChange('textColor', e.target.value)} className="p-1 h-10"/>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <Label>Background</Label>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onRandomBackground}>
+                                <Shuffle className="w-4 h-4"/>
+                            </Button>
+                        </div>
+                        <Tabs defaultValue="pattern" className="w-full">
+                            <TabsList className="grid w-full grid-cols-4">
+                                <TabsTrigger value="pattern">Color</TabsTrigger>
+                                <TabsTrigger value="upload">Upload</TabsTrigger>
+                                <TabsTrigger value="url">URL</TabsTrigger>
+                                <TabsTrigger value="ai">AI</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="pattern" className="pt-4">
+                                <Input id={`bg-color-${index}`} value={config.background} onChange={(e) => onConfigChange('background', e.target.value)} />
+                                <div className="grid grid-cols-5 gap-1 pt-2">
+                                    {backgroundPatterns.map(p => (
+                                        <button key={p.name} title={p.name} onClick={() => onConfigChange('background', p.value)} className={`w-full h-6 rounded-sm border-2 ${config.background === p.value ? 'border-ring' : 'border-transparent'}`} style={{background: p.value}} />
+                                    ))}
+                                </div>
+                            </TabsContent>
+                            <TabsContent value="upload" className="pt-4">
+                                <Label htmlFor={`image-upload-${index}`} className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted">
+                                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                        <Upload className="w-8 h-8 mb-3 text-muted-foreground" />
+                                        <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span></p>
+                                    </div>
+                                    <Input id={`image-upload-${index}`} type="file" className="hidden" onChange={onImageUpload} accept="image/*"/>
+                                </Label>
+                            </TabsContent>
+                            <TabsContent value="url">
+                                <URLBackgroundInput index={index} onSetUrl={onImageUrl} />
+                            </TabsContent>
+                            <TabsContent value="ai">
+                                <AIBackgroundGenerator index={index} onGenerate={onAiGenerateImage} isGenerating={isGeneratingThis} />
+                            </TabsContent>
+                        </Tabs>
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <Label>Font</Label>
+                        <Select value={config.fontFamily} onValueChange={(v) => onConfigChange('fontFamily', v)}>
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent>
+                                {fontFamilies.map(f => <SelectItem key={f.name} value={f.family} style={{fontFamily: f.family}}>{f.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                            <Label htmlFor={`font-size-${index}`}>Font Size</Label>
+                            <Input id={`font-size-${index}`} type="number" value={config.fontSize} onChange={(e) => onConfigChange('fontSize', e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Alignment</Label>
+                            <ToggleGroup type="single" value={config.textAlign} onValueChange={(v) => v && onConfigChange('textAlign', v)} className="w-full">
+                                <ToggleGroupItem value="left" className="w-full"><AlignLeft/></ToggleGroupItem>
+                                <ToggleGroupItem value="center" className="w-full"><AlignCenter/></ToggleGroupItem>
+                                <ToggleGroupItem value="right" className="w-full"><AlignRight/></ToggleGroupItem>
+                            </ToggleGroup>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                            <Label htmlFor={`width-${index}`}>Width</Label>
+                            <Input id={`width-${index}`} type="number" value={config.width} onChange={(e) => onConfigChange('width', e.target.value)} />
+                        </div>
+                            <div className="space-y-2">
+                            <Label htmlFor={`height-${index}`}>Height</Label>
+                            <Input id={`height-${index}`} type="number" value={config.height} onChange={(e) => onConfigChange('height', e.target.value)} />
+                        </div>
+                    </div>
+
+                    {/* Advanced Styling */}
+                    <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="advanced-style">
+                            <AccordionTrigger>Advanced Styling</AccordionTrigger>
+                            <AccordionContent className="space-y-4 pt-4">
+                                    <div className="space-y-2">
+                                    <Label>Letter Spacing: {config.letterSpacing || 0}px</Label>
+                                    <Slider value={[config.letterSpacing || 0]} onValueChange={([val]) => onConfigChange('letterSpacing', val)} min={-10} max={50} step={1} />
+                                </div>
+
+                                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                                    <div className="space-y-0.5">
+                                        <Label>Text Stroke</Label>
+                                    </div>
+                                    <Switch checked={config.textStrokeWidth > 0} onCheckedChange={(checked) => onConfigChange('textStrokeWidth', checked ? 2 : 0)} />
+                                </div>
+                                {config.textStrokeWidth > 0 && (
+                                    <div className="space-y-4 border p-3 rounded-lg">
+                                        <div className="space-y-2">
+                                            <Label>Stroke Width: {config.textStrokeWidth}px</Label>
+                                            <Slider value={[config.textStrokeWidth]} onValueChange={([val]) => onConfigChange('textStrokeWidth', val)} min={0} max={20} step={1} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`text-stroke-color-${index}`}>Stroke Color</Label>
+                                            <Input id={`text-stroke-color-${index}`} type="color" value={config.textStrokeColor || '#000000'} onChange={(e) => onConfigChange('textStrokeColor', e.target.value)} className="p-1 h-10"/>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                                    <div className="space-y-0.5">
+                                        <Label>Text Shadow</Label>
+                                    </div>
+                                    <Switch checked={config.addTextShadow} onCheckedChange={(checked) => onConfigChange('addTextShadow', checked)} />
+                                </div>
+                                {config.addTextShadow && (
+                                    <div className="space-y-4 border p-3 rounded-lg">
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`text-shadow-color-${index}`}>Shadow Color</Label>
+                                            <Input id={`text-shadow-color-${index}`} type="color" value={config.textShadowColor || '#000000'} onChange={(e) => onConfigChange('textShadowColor', e.target.value)} className="p-1 h-10"/>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Shadow Blur: {config.textShadowBlur || 10}px</Label>
+                                            <Slider value={[config.textShadowBlur || 10]} onValueChange={([val]) => onConfigChange('textShadowBlur', val)} min={0} max={50} step={1} />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label>Offset X: {config.textShadowOffsetX || 5}px</Label>
+                                                <Slider value={[config.textShadowOffsetX || 5]} onValueChange={([val]) => onConfigChange('textShadowOffsetX', val)} min={-20} max={20} step={1} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Offset Y: {config.textShadowOffsetY || 5}px</Label>
+                                                <Slider value={[config.textShadowOffsetY || 5]} onValueChange={([val]) => onConfigChange('textShadowOffsetY', val)} min={-20} max={20} step={1} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
+
+
+                    <Button variant="outline" size="sm" onClick={onRemove}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Remove Image
+                    </Button>
+                    </div>
+            </AccordionContent>
+        </AccordionItem>
+    );
+};
+
 export function BatchEditor() {
     const [jsonInput, setJsonInput] = useState(JSON.stringify(exampleJson, null, 2));
     const [configs, setConfigs] = useState<any[]>(exampleJson);
@@ -74,7 +298,15 @@ export function BatchEditor() {
         if (!jsonError) {
              const newJson = JSON.stringify(configs, null, 2);
              if (newJson !== jsonInput) {
-                 setJsonInput(newJson);
+                 // To prevent infinite loops, only update if the stringified version is different
+                 // and the parsed versions are also different (deep check is too slow)
+                 try {
+                    if (JSON.stringify(JSON.parse(jsonInput), null, 2) !== newJson) {
+                       setJsonInput(newJson);
+                    }
+                 } catch (e) {
+                     setJsonInput(newJson);
+                 }
              }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -541,224 +773,24 @@ export function BatchEditor() {
             </div>
         )
     }
-    
-    const AIBackgroundGenerator = ({ index, prompt, setPrompt }: { index: number, prompt: string, setPrompt: (p: string) => void }) => {
-        const isGeneratingThis = generatingAiImageIndex === index;
-        return (
-            <div className="pt-4 space-y-4">
-                <div className="space-y-2">
-                    <Label htmlFor={`ai-prompt-${index}`}>AI Prompt</Label>
-                    <Input 
-                        id={`ai-prompt-${index}`}
-                        value={prompt} 
-                        onChange={(e) => setPrompt(e.target.value)} 
-                        placeholder="e.g., A futuristic cityscape at night"
-                        disabled={isGeneratingThis}
-                    />
-                     <p className="text-xs text-muted-foreground">Describe the background you want to generate.</p>
-                </div>
-                <Button onClick={() => handleAiGenerateImage(index, prompt)} disabled={isGeneratingThis} className="w-full">
-                    {isGeneratingThis ? (
-                        <>
-                            <Bot className="mr-2 h-4 w-4 animate-spin" />
-                            Generating...
-                        </>
-                    ) : (
-                        <>
-                            <Sparkles className="mr-2 h-4 w-4" />
-                            Generate Background
-                        </>
-                    )}
-                </Button>
-            </div>
-        )
-    };
-
-    const URLBackgroundInput = ({ index, url, setUrl }: { index: number, url: string, setUrl: (u: string) => void }) => {
-        return (
-             <div className="pt-4 space-y-2">
-                <Label htmlFor={`url-input-${index}`}>Image URL</Label>
-                <div className="flex gap-2">
-                    <Input id={`url-input-${index}`} type="url" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} />
-                    <Button onClick={() => handleImageUrl(index, url)}><Link className="w-4 h-4" /></Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                    Note: Images from other websites may be subject to CORS restrictions.
-                </p>
-            </div>
-        )
-    }
-
 
     const renderForm = () => (
         <div className="space-y-4">
             <Accordion type="multiple" defaultValue={['item-0']} className="w-full">
-                {configs.map((config, index) => {
-                    const [itemAiPrompt, setItemAiPrompt] = useState('A beautiful sunset over mountains');
-                    const [itemUrl, setItemUrl] = useState(config.backgroundImage?.startsWith('http') ? config.backgroundImage : '');
-                    
-                    return (
-                        <AccordionItem value={`item-${index}`} key={index}>
-                            <AccordionTrigger>
-                                <span className="truncate">Image {index + 1}: {config.text || "Untitled"}</span>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                                 <div className="space-y-4 p-4 pr-2">
-                                    <div className="space-y-2">
-                                        <Label htmlFor={`text-${index}`}>Text</Label>
-                                        <Textarea id={`text-${index}`} value={config.text} onChange={(e) => handleConfigChange(index, 'text', e.target.value)} />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor={`text-color-${index}`}>Text Color</Label>
-                                            <Input id={`text-color-${index}`} type="color" value={config.textColor || '#000000'} onChange={(e) => handleConfigChange(index, 'textColor', e.target.value)} className="p-1 h-10"/>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <Label>Background</Label>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRandomBackground(index)}>
-                                                <Shuffle className="w-4 h-4"/>
-                                            </Button>
-                                        </div>
-                                        <Tabs defaultValue="pattern" className="w-full">
-                                            <TabsList className="grid w-full grid-cols-4">
-                                                <TabsTrigger value="pattern">Color</TabsTrigger>
-                                                <TabsTrigger value="upload">Upload</TabsTrigger>
-                                                <TabsTrigger value="url">URL</TabsTrigger>
-                                                <TabsTrigger value="ai">AI</TabsTrigger>
-                                            </TabsList>
-                                            <TabsContent value="pattern" className="pt-4">
-                                                <Input id={`bg-color-${index}`} value={config.background} onChange={(e) => handleConfigChange(index, 'background', e.target.value)} />
-                                                <div className="grid grid-cols-5 gap-1 pt-2">
-                                                    {backgroundPatterns.map(p => (
-                                                        <button key={p.name} title={p.name} onClick={() => handleConfigChange(index, 'background', p.value)} className={`w-full h-6 rounded-sm border-2 ${config.background === p.value ? 'border-ring' : 'border-transparent'}`} style={{background: p.value}} />
-                                                    ))}
-                                                </div>
-                                            </TabsContent>
-                                            <TabsContent value="upload" className="pt-4">
-                                                <Label htmlFor={`image-upload-${index}`} className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted">
-                                                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                                       <Upload className="w-8 h-8 mb-3 text-muted-foreground" />
-                                                       <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span></p>
-                                                   </div>
-                                                   <Input id={`image-upload-${index}`} type="file" className="hidden" onChange={(e) => handleImageUpload(index, e)} accept="image/*"/>
-                                                </Label>
-                                            </TabsContent>
-                                            <TabsContent value="url">
-                                                <URLBackgroundInput index={index} url={itemUrl} setUrl={setItemUrl} />
-                                            </TabsContent>
-                                            <TabsContent value="ai">
-                                                <AIBackgroundGenerator index={index} prompt={itemAiPrompt} setPrompt={setItemAiPrompt} />
-                                            </TabsContent>
-                                        </Tabs>
-                                    </div>
-                                    
-                                    <div className="space-y-2">
-                                        <Label>Font</Label>
-                                        <Select value={config.fontFamily} onValueChange={(v) => handleConfigChange(index, 'fontFamily', v)}>
-                                            <SelectTrigger><SelectValue/></SelectTrigger>
-                                            <SelectContent>
-                                                {fontFamilies.map(f => <SelectItem key={f.name} value={f.family} style={{fontFamily: f.family}}>{f.name}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                         <div className="space-y-2">
-                                            <Label htmlFor={`font-size-${index}`}>Font Size</Label>
-                                            <Input id={`font-size-${index}`} type="number" value={config.fontSize} onChange={(e) => handleConfigChange(index, 'fontSize', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Alignment</Label>
-                                            <ToggleGroup type="single" value={config.textAlign} onValueChange={(v) => v && handleConfigChange(index, 'textAlign', v)} className="w-full">
-                                                <ToggleGroupItem value="left" className="w-full"><AlignLeft/></ToggleGroupItem>
-                                                <ToggleGroupItem value="center" className="w-full"><AlignCenter/></ToggleGroupItem>
-                                                <ToggleGroupItem value="right" className="w-full"><AlignRight/></ToggleGroupItem>
-                                            </ToggleGroup>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                         <div className="space-y-2">
-                                            <Label htmlFor={`width-${index}`}>Width</Label>
-                                            <Input id={`width-${index}`} type="number" value={config.width} onChange={(e) => handleConfigChange(index, 'width', e.target.value)} />
-                                        </div>
-                                         <div className="space-y-2">
-                                            <Label htmlFor={`height-${index}`}>Height</Label>
-                                            <Input id={`height-${index}`} type="number" value={config.height} onChange={(e) => handleConfigChange(index, 'height', e.target.value)} />
-                                        </div>
-                                    </div>
-
-                                    {/* Advanced Styling */}
-                                    <Accordion type="single" collapsible className="w-full">
-                                        <AccordionItem value="advanced-style">
-                                            <AccordionTrigger>Advanced Styling</AccordionTrigger>
-                                            <AccordionContent className="space-y-4 pt-4">
-                                                 <div className="space-y-2">
-                                                    <Label>Letter Spacing: {config.letterSpacing || 0}px</Label>
-                                                    <Slider value={[config.letterSpacing || 0]} onValueChange={([val]) => handleConfigChange(index, 'letterSpacing', val)} min={-10} max={50} step={1} />
-                                                </div>
-
-                                                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                                                    <div className="space-y-0.5">
-                                                        <Label>Text Stroke</Label>
-                                                    </div>
-                                                    <Switch checked={config.textStrokeWidth > 0} onCheckedChange={(checked) => handleConfigChange(index, 'textStrokeWidth', checked ? 2 : 0)} />
-                                                </div>
-                                                {config.textStrokeWidth > 0 && (
-                                                    <div className="space-y-4 border p-3 rounded-lg">
-                                                        <div className="space-y-2">
-                                                            <Label>Stroke Width: {config.textStrokeWidth}px</Label>
-                                                            <Slider value={[config.textStrokeWidth]} onValueChange={([val]) => handleConfigChange(index, 'textStrokeWidth', val)} min={0} max={20} step={1} />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor={`text-stroke-color-${index}`}>Stroke Color</Label>
-                                                            <Input id={`text-stroke-color-${index}`} type="color" value={config.textStrokeColor || '#000000'} onChange={(e) => handleConfigChange(index, 'textStrokeColor', e.target.value)} className="p-1 h-10"/>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                                                    <div className="space-y-0.5">
-                                                        <Label>Text Shadow</Label>
-                                                    </div>
-                                                    <Switch checked={config.addTextShadow} onCheckedChange={(checked) => handleConfigChange(index, 'addTextShadow', checked)} />
-                                                </div>
-                                                {config.addTextShadow && (
-                                                    <div className="space-y-4 border p-3 rounded-lg">
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor={`text-shadow-color-${index}`}>Shadow Color</Label>
-                                                            <Input id={`text-shadow-color-${index}`} type="color" value={config.textShadowColor || '#000000'} onChange={(e) => handleConfigChange(index, 'textShadowColor', e.target.value)} className="p-1 h-10"/>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <Label>Shadow Blur: {config.textShadowBlur || 10}px</Label>
-                                                            <Slider value={[config.textShadowBlur || 10]} onValueChange={([val]) => handleConfigChange(index, 'textShadowBlur', val)} min={0} max={50} step={1} />
-                                                        </div>
-                                                        <div className="grid grid-cols-2 gap-4">
-                                                            <div className="space-y-2">
-                                                                <Label>Offset X: {config.textShadowOffsetX || 5}px</Label>
-                                                                <Slider value={[config.textShadowOffsetX || 5]} onValueChange={([val]) => handleConfigChange(index, 'textShadowOffsetX', val)} min={-20} max={20} step={1} />
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                <Label>Offset Y: {config.textShadowOffsetY || 5}px</Label>
-                                                                <Slider value={[config.textShadowOffsetY || 5]} onValueChange={([val]) => handleConfigChange(index, 'textShadowOffsetY', val)} min={-20} max={20} step={1} />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </AccordionContent>
-                                        </AccordionItem>
-                                    </Accordion>
-
-
-                                    <Button variant="outline" size="sm" onClick={() => handleRemoveImage(index)}>
-                                        <Trash2 className="mr-2 h-4 w-4" /> Remove Image
-                                    </Button>
-                                 </div>
-                            </AccordionContent>
-                        </AccordionItem>
-                    )
-                })}
+                {configs.map((config, index) => (
+                    <BatchItem
+                        key={index}
+                        config={config}
+                        index={index}
+                        onConfigChange={(field, value) => handleConfigChange(index, field, value)}
+                        onRemove={() => handleRemoveImage(index)}
+                        onRandomBackground={() => handleRandomBackground(index)}
+                        onImageUpload={(e) => handleImageUpload(index, e)}
+                        onImageUrl={(url) => handleImageUrl(index, url)}
+                        onAiGenerateImage={(prompt) => handleAiGenerateImage(index, prompt)}
+                        generatingAiImageIndex={generatingAiImageIndex}
+                    />
+                ))}
             </Accordion>
              <Button variant="outline" onClick={handleAddImage} className="w-full">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Image

@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Code, Bot, AlertTriangle, Sparkles, Trash2, PlusCircle, FormInput, Shuffle, Upload, Link, Copy, LayoutTemplate } from 'lucide-react';
+import { Code, Bot, AlertTriangle, Sparkles, Trash2, PlusCircle, FormInput, Shuffle, Upload, Link, Copy, CheckSquare } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,14 @@ import { Switch } from './ui/switch';
 import { Slider } from './ui/slider';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -31,8 +39,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { imageTemplates } from '@/lib/templates';
+import { cn } from '@/lib/utils';
 
 const AIBackgroundGenerator = ({ index, onGenerate, isGenerating }: { index: number, onGenerate: (prompt: string) => void, isGenerating: boolean }) => {
     const [prompt, setPrompt] = useState('A beautiful sunset over mountains');
@@ -474,6 +482,35 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
     });
 };
 
+const TemplatePreview = ({ template }: { template: { name: string, json: string } }) => {
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    const [config] = useState(() => JSON.parse(template.json)[0]);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (canvas) {
+            drawOnCanvas(canvas, {
+                ...config,
+                dpr: 1, // Lower DPR for previews
+            }).catch(console.error);
+        }
+    }, [config]);
+
+    return (
+        <div className="flex flex-col gap-2">
+            <canvas 
+                ref={canvasRef} 
+                className="w-full shadow-lg rounded-md bg-card-foreground/5"
+                style={{
+                    aspectRatio: `${config.width || 1280} / ${config.height || 720}`
+                }}
+            />
+            <p className="text-sm font-medium text-center">{template.name}</p>
+        </div>
+    );
+};
+
+
 export function BatchEditor() {
     const [jsonInput, setJsonInput] = useState('[\n  \n]');
     const [configs, setConfigs] = useState<any[]>([]);
@@ -493,7 +530,11 @@ export function BatchEditor() {
     // State for "Apply styles from item"
     const [applyStylesDialogOpen, setApplyStylesDialogOpen] = useState(false);
     const [styleSourceIndex, setStyleSourceIndex] = useState<number | null>(null);
-    const [templatePopoverOpen, setTemplatePopoverOpen] = useState(false);
+    
+    // State for Template Dialog
+    const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+    const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+
 
     const { toast } = useToast();
 
@@ -776,7 +817,7 @@ export function BatchEditor() {
     };
 
 
-    const handleAddImage = () => {
+    const handleAddBlankImage = () => {
         setConfigs([
             ...configs,
             {
@@ -890,16 +931,33 @@ export function BatchEditor() {
         });
     };
 
-    const handleLoadTemplate = (templateValue: string) => {
-        if (!templateValue) return;
-        const newJson = JSON.stringify(JSON.parse(templateValue), null, 2);
-        setJsonInput(newJson);
-        toast({
-            title: "Template Loaded",
-            description: "The editor has been updated with the selected template."
+    const handleTemplateSelect = (templateJson: string) => {
+        setSelectedTemplates(prev => {
+            if (prev.includes(templateJson)) {
+                return prev.filter(t => t !== templateJson);
+            } else {
+                return [...prev, templateJson];
+            }
         });
-        setTemplatePopoverOpen(false);
     };
+
+    const handleAddFromTemplates = () => {
+        const newConfigs = selectedTemplates.map(templateJson => {
+            const template = JSON.parse(templateJson)[0];
+            // Ensure new IDs are generated for text layers
+            template.textLayers = template.textLayers.map((l: any) => ({ ...l, id: Date.now() + Math.random() }));
+            return template;
+        });
+
+        setConfigs(prev => [...prev, ...newConfigs]);
+        toast({
+            title: `${newConfigs.length} template(s) added`,
+            description: 'The new images have been added to your batch.',
+        });
+        setTemplateDialogOpen(false);
+        setSelectedTemplates([]);
+    };
+
 
     const BatchPreview = ({ config, index }: { config: any; index: number }) => {
         const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -1003,9 +1061,14 @@ export function BatchEditor() {
                     />
                 ))}
             </Accordion>
-             <Button variant="outline" onClick={handleAddImage} className="w-full">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Image
-            </Button>
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setTemplateDialogOpen(true)} className="w-full">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Image from Template
+                </Button>
+                 <Button variant="outline" onClick={handleAddBlankImage} className="w-full">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Blank Image
+                </Button>
+            </div>
         </div>
     )
 
@@ -1037,31 +1100,11 @@ export function BatchEditor() {
                         )}
                     </Button>
                 </div>
-                 <div className="space-y-2">
-                    <Label>Load a Template</Label>
-                    <Popover open={templatePopoverOpen} onOpenChange={setTemplatePopoverOpen}>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-full justify-start">
-                                <LayoutTemplate className="mr-2 h-4 w-4" />
-                                Choose a template...
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-1">
-                            <div className="flex flex-col">
-                                {imageTemplates.map(template => (
-                                    <Button 
-                                        key={template.name} 
-                                        variant="ghost" 
-                                        className="justify-start"
-                                        onClick={() => handleLoadTemplate(template.json)}
-                                    >
-                                        {template.name}
-                                    </Button>
-                                ))}
-                            </div>
-                        </PopoverContent>
-                    </Popover>
-                    <p className="text-xs text-muted-foreground">Start from a pre-designed layout.</p>
+                 <div className="space-y-2 self-center">
+                     <p className="text-sm font-medium text-muted-foreground text-center">Or start with a template:</p>
+                    <Button variant="outline" onClick={() => setTemplateDialogOpen(true)} className="w-full">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add from Template Library
+                    </Button>
                 </div>
             </div>
             
@@ -1134,6 +1177,44 @@ export function BatchEditor() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+                <DialogContent className="max-w-4xl h-[90vh]">
+                    <DialogHeader>
+                        <DialogTitle>Add Images from Templates</DialogTitle>
+                        <DialogDescription>
+                            Select one or more templates to add to your batch.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto p-1">
+                        {imageTemplates.map((template) => {
+                            const isSelected = selectedTemplates.includes(template.json);
+                            return (
+                                <div 
+                                    key={template.name} 
+                                    className={cn(
+                                        "relative border-2 rounded-lg cursor-pointer transition-all",
+                                        isSelected ? "border-primary" : "border-transparent hover:border-muted"
+                                    )}
+                                    onClick={() => handleTemplateSelect(template.json)}
+                                >
+                                    <TemplatePreview template={template} />
+                                    {isSelected && (
+                                        <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
+                                            <CheckSquare className="h-5 w-5" />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setTemplateDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleAddFromTemplates} disabled={selectedTemplates.length === 0}>
+                            Add {selectedTemplates.length > 0 ? selectedTemplates.length : ''} Selected Image(s)
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

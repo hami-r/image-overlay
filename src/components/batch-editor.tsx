@@ -376,7 +376,7 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
                                 <TabsTrigger value="ai">AI</TabsTrigger>
                             </TabsList>
                             <TabsContent value="pattern" className="pt-4">
-                                <Input id={`bg-color-${index}`} value={config.background} onChange={(e) => onConfigChange('background', e.target.value)} />
+                                <Input id={`bg-color-${index}`} value={config.background ?? ''} onChange={(e) => onConfigChange('background', e.target.value)} />
                                 <div className="grid grid-cols-5 gap-1 pt-2">
                                     {backgroundPatterns.map(p => (
                                         <button key={p.name} title={p.name} onClick={() => onConfigChange('background', p.value)} className={`w-full h-6 rounded-sm border-2 ${config.background === p.value ? 'border-ring' : 'border-transparent'}`} style={{background: p.value}} />

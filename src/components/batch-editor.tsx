@@ -1,10 +1,11 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Code, Bot, AlertTriangle, Sparkles, Trash2, PlusCircle, FormInput, Shuffle, Upload, Link, Copy } from 'lucide-react';
+import { Code, Bot, AlertTriangle, Sparkles, Trash2, PlusCircle, FormInput, Shuffle, Upload, Link, Copy, LayoutTemplate } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,121 +31,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-
-const exampleJson = [
-  {
-    "textLayers": [
-      {
-        "text": "Welcome to the Future",
-        "textColor": "#FFFFFF",
-        "fontSize": 96,
-        "fontFamily": "'Inter', sans-serif"
-      },
-      {
-        "text": "A new era of design.",
-        "textColor": "#DDDDDD",
-        "fontSize": 32,
-        "fontFamily": "'Inter', sans-serif"
-      }
-    ],
-    "background": "linear-gradient(to right, #2b5876, #4e4376)",
-    "width": 1280,
-    "height": 720
-  },
-  {
-    "textLayers": [
-      {
-        "text": "Product Launch",
-        "textColor": "#000000",
-        "fontSize": 80,
-        "fontFamily": "'Playfair Display', serif",
-        "addTextShadow": true
-      },
-      {
-        "text": "Coming Soon",
-        "textColor": "#333333",
-        "fontSize": 40
-      }
-    ],
-    "background": "#C1E1C1",
-    "width": 1080,
-    "height": 1080
-  },
-  {
-    "textLayers": [
-      {
-        "text": "Using an Image URL",
-        "textColor": "#000000",
-        "fontSize": 80,
-        "addTextShadow": true
-      }
-    ],
-    "backgroundImage": "https://images.unsplash.com/photo-1554034483-04fda0d3507b?q=80&w=2070"
-  },
-  {
-    "textLayers": [
-      {
-        "text": "Batch\nCreation\nRocks!",
-        "textColor": "#FFFFFF",
-        "fontSize": 128,
-        "fontFamily": "'Playfair Display', serif",
-        "addTextShadow": true,
-        "textShadowBlur": 5,
-        "x": 540,
-        "y": 480
-      },
-      {
-        "text": "So easy!",
-        "textColor": "#FFFFFF",
-        "fontSize": 64,
-        "fontFamily": "'Inter', sans-serif",
-        "textStrokeWidth": 2,
-        "textStrokeColor": "#000000",
-        "x": 540,
-        "y": 800
-      }
-    ],
-    "background": "#C1E1C1",
-    "width": 1080,
-    "height": 1080
-  },
-  {
-    "textLayers": [
-      {
-        "text": "Main Title",
-        "textColor": "#FFFFFF",
-        "fontSize": 128,
-        "fontFamily": "'Playfair Display', serif",
-        "addTextShadow": true,
-        "textShadowBlur": 5,
-        "textAlign": "center",
-        "x": 640,
-        "y": 200
-      },
-      {
-        "text": "A subtitle describing the content.",
-        "textColor": "#EFEFEF",
-        "fontSize": 48,
-        "fontFamily": "'Inter', sans-serif",
-        "textAlign": "center",
-        "x": 640,
-        "y": 350
-      },
-      {
-        "text": "Bottom-left note",
-        "textColor": "#FFFFFF",
-        "fontSize": 24,
-        "fontFamily": "'Inter', sans-serif",
-        "textAlign": "left",
-        "x": 50,
-        "y": 670
-      }
-    ],
-    "background": "#C1E1C1",
-    "width": 1280,
-    "height": 720
-  }
-];
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { imageTemplates } from '@/lib/templates';
 
 const AIBackgroundGenerator = ({ index, onGenerate, isGenerating }: { index: number, onGenerate: (prompt: string) => void, isGenerating: boolean }) => {
     const [prompt, setPrompt] = useState('A beautiful sunset over mountains');
@@ -561,9 +449,13 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                         ctx.fillStyle = textBackgroundColor;
 
                         let rectX;
-                        if (textAlign === 'left') rectX = x - bgPadding;
-                        else if (textAlign === 'right') rectX = x - textWidth - bgPadding;
-                        else rectX = x - textWidth / 2 - bgPadding;
+                        if (textAlign === 'left') {
+                            rectX = x - bgPadding;
+                        } else if (textAlign === 'right') {
+                            rectX = x - textWidth - bgPadding;
+                        } else {
+                            rectX = x - textWidth / 2 - bgPadding;
+                        }
                         
                         const rectY = currentLineY - (lineHeight/2) - bgPadding/2;
                         ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
@@ -586,8 +478,8 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
 };
 
 export function BatchEditor() {
-    const [jsonInput, setJsonInput] = useState(JSON.stringify(exampleJson, null, 2));
-    const [configs, setConfigs] = useState<any[]>(exampleJson);
+    const [jsonInput, setJsonInput] = useState('[\n  \n]');
+    const [configs, setConfigs] = useState<any[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isGeneratingJson, setIsGeneratingJson] = useState(false);
     const [jsonError, setJsonError] = useState<string | null>(null);
@@ -711,7 +603,7 @@ export function BatchEditor() {
                 description: "The configuration has been updated with the AI's response.",
             });
         } catch (error: any) {
-             if (error.message.includes('curly bracket')) {
+             if (error instanceof SyntaxError) {
                 toast({
                     variant: 'destructive',
                     title: 'AI Generation Failed',
@@ -1000,6 +892,15 @@ export function BatchEditor() {
         });
     };
 
+    const handleLoadTemplate = (templateValue: string) => {
+        if (!templateValue) return;
+        const newJson = JSON.stringify(JSON.parse(templateValue), null, 2);
+        setJsonInput(newJson);
+        toast({
+            title: "Template Loaded",
+            description: "The editor has been updated with the selected template."
+        });
+    };
 
     const BatchPreview = ({ config, index }: { config: any; index: number }) => {
         const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -1105,29 +1006,58 @@ export function BatchEditor() {
 
     return (
         <div className="space-y-6">
-            <div className="space-y-4 p-4 border rounded-lg bg-card-foreground/5">
-                 <Label htmlFor="ai-prompt">Generate with AI</Label>
-                 <Input 
-                    id="ai-prompt"
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                    placeholder="e.g., Create 5 images for a coffee shop promotion"
-                    disabled={isGeneratingJson || isGenerating}
-                 />
-                 <p className="text-xs text-muted-foreground">Describe the set of images you want to create. The AI will generate the configuration for you.</p>
-                 <Button onClick={handleGenerateJson} disabled={isGeneratingJson || isGenerating} className="w-full">
-                     {isGeneratingJson ? (
-                        <>
-                            <Bot className="mr-2 h-4 w-4 animate-spin" />
-                            Generating Config...
-                        </>
-                    ) : (
-                        <>
-                            <Sparkles className="mr-2 h-4 w-4" />
-                            Generate Config with AI
-                        </>
-                    )}
-                 </Button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-card-foreground/5">
+                <div className="space-y-2">
+                    <Label htmlFor="ai-prompt">Generate with AI</Label>
+                    <Textarea 
+                        id="ai-prompt"
+                        value={aiPrompt}
+                        onChange={(e) => setAiPrompt(e.target.value)}
+                        placeholder="e.g., Create 5 images for a coffee shop promotion"
+                        disabled={isGeneratingJson || isGenerating}
+                        rows={3}
+                    />
+                    <p className="text-xs text-muted-foreground">Describe the set of images you want to create.</p>
+                    <Button onClick={handleGenerateJson} disabled={isGeneratingJson || isGenerating} className="w-full">
+                        {isGeneratingJson ? (
+                            <>
+                                <Bot className="mr-2 h-4 w-4 animate-spin" />
+                                Generating...
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles className="mr-2 h-4 w-4" />
+                                Generate with AI
+                            </>
+                        )}
+                    </Button>
+                </div>
+                 <div className="space-y-2">
+                    <Label>Load a Template</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start">
+                                <LayoutTemplate className="mr-2 h-4 w-4" />
+                                Choose a template...
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-1">
+                            <div className="flex flex-col">
+                                {imageTemplates.map(template => (
+                                    <Button 
+                                        key={template.name} 
+                                        variant="ghost" 
+                                        className="justify-start"
+                                        onClick={() => handleLoadTemplate(template.json)}
+                                    >
+                                        {template.name}
+                                    </Button>
+                                ))}
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                    <p className="text-xs text-muted-foreground">Start from a pre-designed layout.</p>
+                </div>
             </div>
             
             <Tabs defaultValue="form">
@@ -1202,7 +1132,5 @@ export function BatchEditor() {
         </div>
     );
 }
-
-    
 
     

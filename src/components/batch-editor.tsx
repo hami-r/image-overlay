@@ -711,15 +711,23 @@ export function BatchEditor() {
                 description: "The configuration has been updated with the AI's response.",
             });
         } catch (error: any) {
-            console.error("AI JSON Generation Error:", error);
-            const description = error.message.includes('JSON.parse')
-                ? "The AI returned invalid JSON. Please try again."
-                : error.message || "An unknown error occurred.";
-            toast({
-                variant: "destructive",
-                title: "AI Generation Failed",
-                description: description,
-            });
+             if (error.message.includes('curly bracket')) {
+                toast({
+                    variant: 'destructive',
+                    title: 'AI Generation Failed',
+                    description: 'The AI returned invalid JSON. Please try again or refine your prompt.',
+                });
+             } else {
+                console.error("AI JSON Generation Error:", error);
+                const description = error.message.includes('JSON.parse')
+                    ? "The AI returned invalid JSON. Please try again."
+                    : error.message || "An unknown error occurred.";
+                toast({
+                    variant: "destructive",
+                    title: "AI Generation Failed",
+                    description: description,
+                });
+             }
         } finally {
             setIsGeneratingJson(false);
         }
@@ -747,7 +755,9 @@ export function BatchEditor() {
                 newConfig.textLayers = newConfig.textLayers.map((l: any) => {
                     if (l.id === layerId) {
                         const newLayer = { ...l };
-                        if (["fontSize", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY", "x", "y"].includes(field)) {
+                        if (["fontSize", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY"].includes(field)) {
+                            newLayer[field] = value === '' ? undefined : Number(value);
+                        } else if (["x", "y"].includes(field)) {
                             newLayer[field] = value === '' ? undefined : Number(value);
                         } else {
                             newLayer[field] = value;
@@ -917,16 +927,35 @@ export function BatchEditor() {
     }
 
     const handleApplyToAll = (field: string, value: any) => {
-        let newConfigs = configs.map(config => {
-            let newConfig = { ...config, [field]: value };
-            if (field === 'background' && value) {
-                delete newConfig.backgroundImage;
-            }
-            if (field === 'width' || field === 'height') {
-                 newConfig[field] = Number(value);
-            }
-            return newConfig;
-        });
+        let newConfigs;
+
+        if (field === 'textColor' || field === 'fontFamily') {
+             newConfigs = configs.map(config => {
+                const newConfig = { ...config };
+                if (newConfig.textLayers && newConfig.textLayers.length > 0) {
+                    newConfig.textLayers = newConfig.textLayers.map((layer:any, index: number) => {
+                        // Only apply to first layer for some properties if desired
+                        if (index === 0) {
+                            return { ...layer, [field]: value };
+                        }
+                        return layer;
+                    });
+                }
+                return newConfig;
+            });
+        } else {
+            newConfigs = configs.map(config => {
+                let newConfig = { ...config, [field]: value };
+                if (field === 'background' && value) {
+                    delete newConfig.backgroundImage;
+                }
+                if (field === 'width' || field === 'height') {
+                    newConfig[field] = Number(value);
+                }
+                return newConfig;
+            });
+        }
+        
         setConfigs(newConfigs);
         toast({
             title: "Applied to All",
@@ -1014,7 +1043,7 @@ export function BatchEditor() {
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <Label>Font Family</Label>
+                        <Label>Font Family (for first layer)</Label>
                         <div className="flex gap-2">
                             <Select value={globalFontFamily} onValueChange={setGlobalFontFamily}>
                                 <SelectTrigger><SelectValue placeholder="Select a font" /></SelectTrigger>
@@ -1026,7 +1055,7 @@ export function BatchEditor() {
                         </div>
                     </div>
                      <div className="space-y-2">
-                        <Label>Text Color</Label>
+                        <Label>Text Color (for first layer)</Label>
                         <div className="flex gap-2">
                             <Input type="color" value={globalTextColor} onChange={e => setGlobalTextColor(e.target.value)} className="p-1 h-10"/>
                             <Button onClick={() => handleApplyToAll('textColor', globalTextColor)}>Apply</Button>

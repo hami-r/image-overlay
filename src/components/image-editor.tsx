@@ -13,36 +13,37 @@ import { Slider } from '@/components/ui/slider';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { fontFamilies } from '@/lib/fonts';
 import { backgroundPatterns } from '@/lib/backgrounds';
-import { AlignLeft, AlignCenter, AlignRight, CaseUpper, CaseLower, Pilcrow, Heading1, Upload, Download, Sparkles, Bot, Shuffle, Link } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, CaseUpper, CaseLower, Pilcrow, Heading1, Upload, Download, Sparkles, Bot, Shuffle, Link, PlusCircle, Trash2 } from 'lucide-react';
 import { generateBackgroundImage } from '@/ai/flows/generate-background-image';
 import { useToast } from '@/hooks/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 
 type CaseType = 'normal' | 'uppercase' | 'lowercase' | 'titlecase' | 'pascalcase';
 
+const defaultTextLayer = {
+  id: Date.now(),
+  text: 'Your Text Here',
+  textColor: '#000000',
+  fontSize: 64,
+  fontFamily: fontFamilies[0].family,
+  textAlign: 'center' as 'left' | 'center' | 'right',
+  letterSpacing: 0,
+  addTextShadow: false,
+  textShadowColor: 'rgba(0,0,0,0.5)',
+  textShadowBlur: 10,
+  textShadowOffsetX: 5,
+  textShadowOffsetY: 5,
+  textStrokeWidth: 0,
+  textStrokeColor: '#FFFFFF',
+  addTextBackground: false,
+  textBackgroundColor: 'rgba(0, 0, 0, 0.5)',
+};
+
 export function ImageEditor() {
-  const [text, setText] = useState('Your Text Here');
-  const [textColor, setTextColor] = useState('#000000');
-  const [fontSize, setFontSize] = useState(64);
-  const [fontFamily, setFontFamily] = useState(fontFamilies[0].family);
-  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('center');
-  const [textCase, setTextCase] = useState<CaseType>('normal');
+  const [textLayers, setTextLayers] = useState([defaultTextLayer]);
   const [background, setBackground] = useState(backgroundPatterns[0].value);
   const [backgroundImageSrc, setBackgroundImageSrc] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState('');
-
-  const [addTextBackground, setAddTextBackground] = useState(false);
-  const [textBackgroundColor, setTextBackgroundColor] = useState('rgba(0, 0, 0, 0.5)');
-  
-  // New text styling states
-  const [textStrokeWidth, setTextStrokeWidth] = useState(0);
-  const [textStrokeColor, setTextStrokeColor] = useState('#FFFFFF');
-  const [addTextShadow, setAddTextShadow] = useState(false);
-  const [textShadowColor, setTextShadowColor] = useState('rgba(0, 0, 0, 0.5)');
-  const [textShadowBlur, setTextShadowBlur] = useState(10);
-  const [textShadowOffsetX, setTextShadowOffsetX] = useState(5);
-  const [textShadowOffsetY, setTextShadowOffsetY] = useState(5);
-  const [letterSpacing, setLetterSpacing] = useState(0);
   
   const [aiPrompt, setAiPrompt] = useState('A beautiful sunset over mountains');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -50,6 +51,29 @@ export function ImageEditor() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [previewDim, setPreviewDim] = useState({ width: 1280, height: 720 });
+
+  const handleLayerChange = (id: number, field: string, value: any) => {
+    setTextLayers(layers => layers.map(layer => 
+      layer.id === id ? { ...layer, [field]: value } : layer
+    ));
+  };
+  
+  const addLayer = () => {
+    setTextLayers(layers => [...layers, { ...defaultTextLayer, id: Date.now(), text: "New Layer" }]);
+  };
+
+  const removeLayer = (id: number) => {
+    if (textLayers.length > 1) {
+      setTextLayers(layers => layers.filter(layer => layer.id !== id));
+    } else {
+        toast({
+            variant: "destructive",
+            title: "Cannot remove last layer",
+            description: "You must have at least one text layer.",
+        });
+    }
+  };
+
 
   const transformText = useCallback((inputText: string, caseType: CaseType) => {
     switch (caseType) {
@@ -252,71 +276,94 @@ export function ImageEditor() {
     });
 
     drawBackground.then(() => {
-        const finalFont = `${fontSize}px ${fontFamily}`;
-        ctx.font = finalFont;
-        ctx.fillStyle = textColor;
-        ctx.textAlign = textAlign;
-        ctx.textBaseline = 'middle';
-        ctx.letterSpacing = `${letterSpacing}px`;
-
-        if (addTextShadow) {
-            ctx.shadowColor = textShadowColor;
-            ctx.shadowBlur = textShadowBlur;
-            ctx.shadowOffsetX = textShadowOffsetX;
-            ctx.shadowOffsetY = textShadowOffsetY;
-        }
-
-        const transformedText = transformText(text, textCase);
-        const manualLines = transformedText.split('\n');
-        const padding = 80;
-        const maxTextWidth = width - padding;
-
-        const lines = manualLines.flatMap(line => wrapText(ctx, line, maxTextWidth));
-
-        const lineHeight = fontSize * 1.2;
-        const totalTextHeight = (lines.length - 1) * lineHeight;
+        let totalTextHeight = 0;
+        const lineHeights: number[] = [];
         
-        let startY = (height - totalTextHeight) / 2;
+        textLayers.forEach(layer => {
+            const lineHeight = layer.fontSize * 1.2;
+            ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
+            const lines = wrapText(ctx, layer.text, width - 80);
+            totalTextHeight += (lines.length) * lineHeight;
+            lineHeights.push(lineHeight);
+        });
+        
+        let currentY = (height - totalTextHeight) / 2;
 
-        lines.forEach((line, index) => {
-            const y = startY + index * lineHeight;
-            let x;
-            switch(textAlign) {
-                case 'left': x = 40; break;
-                case 'right': x = width - 40; break;
-                case 'center': default: x = width / 2; break;
+        textLayers.forEach((layer, layerIndex) => {
+            const {
+                text,
+                textColor,
+                fontSize,
+                fontFamily,
+                textAlign,
+                letterSpacing,
+                addTextShadow,
+                textShadowColor,
+                textShadowBlur,
+                textShadowOffsetX,
+                textShadowOffsetY,
+                textStrokeWidth,
+                textStrokeColor,
+                addTextBackground,
+                textBackgroundColor
+            } = layer;
+            
+            ctx.font = `${fontSize}px ${fontFamily}`;
+            ctx.fillStyle = textColor;
+            ctx.textAlign = textAlign as CanvasTextAlign;
+            ctx.textBaseline = 'middle';
+            ctx.letterSpacing = `${letterSpacing}px`;
+
+            if (addTextShadow) {
+                ctx.shadowColor = textShadowColor;
+                ctx.shadowBlur = textShadowBlur;
+                ctx.shadowOffsetX = textShadowOffsetX;
+                ctx.shadowOffsetY = textShadowOffsetY;
+            } else {
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
             }
 
-            if(addTextBackground) {
-                const textMetrics = ctx.measureText(line);
-                const textWidth = textMetrics.width;
-                const bgPadding = fontSize / 4;
-                // Temporarily disable shadow for background rect
-                const currentShadowColor = ctx.shadowColor;
-                ctx.shadowColor = 'transparent';
-                ctx.fillStyle = textBackgroundColor;
-                
-                let rectX;
-                if (textAlign === 'center') {
-                    rectX = x - textWidth / 2 - bgPadding;
-                } else if (textAlign === 'left') {
-                    rectX = x - bgPadding;
-                } else { // right
-                    rectX = x - textWidth - bgPadding;
+            const padding = 80;
+            const maxTextWidth = width - padding;
+            const lines = wrapText(ctx, text, maxTextWidth);
+
+            const lineHeight = lineHeights[layerIndex];
+            
+            lines.forEach((line: string) => {
+                let x;
+                switch (textAlign) {
+                    case 'left': x = padding / 2; break;
+                    case 'right': x = width - (padding / 2); break;
+                    case 'center': default: x = width / 2; break;
                 }
                 
-                const rectY = y - (lineHeight/2) - bgPadding/2;
-                ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
-                ctx.shadowColor = currentShadowColor; // Restore shadow
-                ctx.fillStyle = textColor;
-            }
-            
-            if (textStrokeWidth > 0) {
-                ctx.strokeStyle = textStrokeColor;
-                ctx.lineWidth = textStrokeWidth;
-                ctx.strokeText(line, x, y);
-            }
-            ctx.fillText(line, x, y);
+                if (addTextBackground) {
+                    const textMetrics = ctx.measureText(line);
+                    const textWidth = textMetrics.width;
+                    const bgPadding = fontSize / 4;
+                    const currentShadow = ctx.shadowColor;
+                    ctx.shadowColor = 'transparent';
+                    ctx.fillStyle = textBackgroundColor;
+                    let rectX = (textAlign === 'center') ? x - textWidth / 2 - bgPadding : (textAlign === 'left') ? x - bgPadding : x - textWidth - bgPadding;
+                    const rectY = currentY - (lineHeight/2) - bgPadding/2;
+                    ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
+                    ctx.shadowColor = currentShadow;
+                    ctx.fillStyle = textColor;
+                }
+                
+                if (textStrokeWidth > 0) {
+                    ctx.strokeStyle = textStrokeColor;
+                    ctx.lineWidth = textStrokeWidth;
+                    ctx.strokeText(line, x, currentY);
+                }
+
+                ctx.fillText(line, x, currentY);
+                currentY += lineHeight;
+            });
+             currentY += lineHeight / 2; // Add some space between layers
         });
 
         const link = document.createElement('a');
@@ -354,24 +401,6 @@ export function ImageEditor() {
     background: background,
   };
 
-  const textStyle: React.CSSProperties = {
-    color: textColor,
-    fontSize: `${fontSize / 32}rem`, // Scale font size for preview
-    fontFamily: fontFamily,
-    textAlign: textAlign,
-    lineHeight: 1.2,
-    whiteSpace: 'pre-wrap',
-    padding: '1rem',
-    wordBreak: 'break-word',
-    letterSpacing: `${letterSpacing / 32}rem`,
-    WebkitTextStroke: textStrokeWidth > 0 ? `${textStrokeWidth / 16}rem ${textStrokeColor}` : 'unset',
-    textShadow: addTextShadow ? `${textShadowOffsetX/16}rem ${textShadowOffsetY/16}rem ${textShadowBlur/16}rem ${textShadowColor}` : 'none',
-  };
-
-  const textContainerStyle: React.CSSProperties = {
-      backgroundColor: addTextBackground ? textBackgroundColor : 'transparent',
-      borderRadius: '0.25rem'
-  }
   
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -382,125 +411,132 @@ export function ImageEditor() {
         </CardHeader>
         <CardContent className="space-y-6">
           
-          <Accordion type="single" collapsible defaultValue="text">
-            <AccordionItem value="text">
-                <AccordionTrigger>Text</AccordionTrigger>
+          <Accordion type="multiple" defaultValue={[`layer-${textLayers[0]?.id}`]} className="w-full">
+            <AccordionItem value="text-layers">
+                <AccordionTrigger>Text Layers</AccordionTrigger>
                 <AccordionContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="text-input">Overlay Text</Label>
-                        <Textarea id="text-input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Your text here" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                        <Label htmlFor="text-color">Text Color</Label>
-                        <Input id="text-color" type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="p-1 h-10"/>
-                        </div>
-                        <div className="space-y-2">
-                        <Label htmlFor="font-family">Font Family</Label>
-                        <Select value={fontFamily} onValueChange={setFontFamily}>
-                            <SelectTrigger id="font-family"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                            {fontFamilies.map(font => <SelectItem key={font.name} value={font.family} style={{ fontFamily: font.family }}>{font.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Font Size: {fontSize}px</Label>
-                        <Slider value={[fontSize]} onValueChange={([val]) => setFontSize(val)} min={16} max={256} step={1} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Letter Spacing: {letterSpacing}px</Label>
-                        <Slider value={[letterSpacing]} onValueChange={([val]) => setLetterSpacing(val)} min={-10} max={50} step={1} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Text Alignment</Label>
-                        <ToggleGroup type="single" value={textAlign} onValueChange={(val: 'left' | 'center' | 'right') => val && setTextAlign(val)} className="w-full">
-                        <ToggleGroupItem value="left" className="w-full"><AlignLeft /></ToggleGroupItem>
-                        <ToggleGroupItem value="center" className="w-full"><AlignCenter /></ToggleGroupItem>
-                        <ToggleGroupItem value="right" className="w-full"><AlignRight /></ToggleGroupItem>
-                        </ToggleGroup>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Text Case</Label>
-                        <Select value={textCase} onValueChange={(v: CaseType) => setTextCase(v)}>
-                            <SelectTrigger><SelectValue/></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="normal"><span className="flex items-center gap-2"><Pilcrow className="w-4 h-4"/> Normal</span></SelectItem>
-                                <SelectItem value="uppercase"><span className="flex items-center gap-2"><CaseUpper className="w-4 h-4"/> UPPERCASE</span></SelectItem>
-                                <SelectItem value="lowercase"><span className="flex items-center gap-2"><CaseLower className="w-4 h-4"/> lowercase</span></SelectItem>
-                                <SelectItem value="titlecase"><span className="flex items-center gap-2"><Heading1 className="w-4 h-4"/> Title Case</span></SelectItem>
-                                <SelectItem value="pascalcase"><span className="flex items-center gap-2"><Pilcrow className="w-4 h-4"/> PascalCase</span></SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </AccordionContent>
-            </AccordionItem>
+                    <Accordion type="multiple" defaultValue={[`layer-${textLayers[0]?.id}`]} className="w-full">
+                     {textLayers.map((layer, index) => (
+                        <AccordionItem key={layer.id} value={`layer-${layer.id}`}>
+                            <AccordionTrigger>
+                                <span className="truncate">Layer {index+1}: {layer.text}</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="space-y-4 pt-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor={`text-input-${layer.id}`}>Overlay Text</Label>
+                                    <Textarea id={`text-input-${layer.id}`} value={layer.text} onChange={(e) => handleLayerChange(layer.id, 'text', e.target.value)} placeholder="Your text here" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                    <Label htmlFor={`text-color-${layer.id}`}>Text Color</Label>
+                                    <Input id={`text-color-${layer.id}`} type="color" value={layer.textColor} onChange={(e) => handleLayerChange(layer.id, 'textColor', e.target.value)} className="p-1 h-10"/>
+                                    </div>
+                                    <div className="space-y-2">
+                                    <Label htmlFor={`font-family-${layer.id}`}>Font Family</Label>
+                                    <Select value={layer.fontFamily} onValueChange={(v) => handleLayerChange(layer.id, 'fontFamily', v)}>
+                                        <SelectTrigger id={`font-family-${layer.id}`}><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                        {fontFamilies.map(font => <SelectItem key={font.name} value={font.family} style={{ fontFamily: font.family }}>{font.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Font Size: {layer.fontSize}px</Label>
+                                    <Slider value={[layer.fontSize]} onValueChange={([val]) => handleLayerChange(layer.id, 'fontSize', val)} min={16} max={256} step={1} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Letter Spacing: {layer.letterSpacing}px</Label>
+                                    <Slider value={[layer.letterSpacing]} onValueChange={([val]) => handleLayerChange(layer.id, 'letterSpacing', val)} min={-10} max={50} step={1} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Text Alignment</Label>
+                                    <ToggleGroup type="single" value={layer.textAlign} onValueChange={(val: 'left' | 'center' | 'right') => val && handleLayerChange(layer.id, 'textAlign', val)} className="w-full">
+                                    <ToggleGroupItem value="left" className="w-full"><AlignLeft /></ToggleGroupItem>
+                                    <ToggleGroupItem value="center" className="w-full"><AlignCenter /></ToggleGroupItem>
+                                    <ToggleGroupItem value="right" className="w-full"><AlignRight /></ToggleGroupItem>
+                                    </ToggleGroup>
+                                </div>
 
-            <AccordionItem value="text-style">
-                <AccordionTrigger>Styling</AccordionTrigger>
-                <AccordionContent className="space-y-4">
-                    <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                        <div className="space-y-0.5">
-                            <Label>Text Background</Label>
-                            <p className="text-xs text-muted-foreground">Improve readability.</p>
-                        </div>
-                        <Switch checked={addTextBackground} onCheckedChange={setAddTextBackground} />
-                    </div>
-                    {addTextBackground && (
-                        <div className="space-y-2 border p-3 rounded-lg">
-                        <Label htmlFor="text-bg-color">Text BG Color</Label>
-                        <Input id="text-bg-color" type="color" value={textBackgroundColor} onChange={(e) => setTextBackgroundColor(e.target.value)} className="p-1 h-10"/>
-                        </div>
-                    )}
-                     <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                        <div className="space-y-0.5">
-                            <Label>Text Stroke</Label>
-                             <p className="text-xs text-muted-foreground">Add an outline to text.</p>
-                        </div>
-                        <Switch checked={textStrokeWidth > 0} onCheckedChange={(checked) => setTextStrokeWidth(checked ? 2 : 0)} />
-                    </div>
-                    {textStrokeWidth > 0 && (
-                        <div className="space-y-4 border p-3 rounded-lg">
-                            <div className="space-y-2">
-                                <Label>Stroke Width: {textStrokeWidth}px</Label>
-                                <Slider value={[textStrokeWidth]} onValueChange={([val]) => setTextStrokeWidth(val)} min={0} max={20} step={1} />
-                            </div>
-                             <div className="space-y-2">
-                                <Label htmlFor="text-stroke-color">Stroke Color</Label>
-                                <Input id="text-stroke-color" type="color" value={textStrokeColor} onChange={(e) => setTextStrokeColor(e.target.value)} className="p-1 h-10"/>
-                            </div>
-                        </div>
-                    )}
-                    <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                        <div className="space-y-0.5">
-                            <Label>Text Shadow</Label>
-                            <p className="text-xs text-muted-foreground">Add a drop shadow.</p>
-                        </div>
-                        <Switch checked={addTextShadow} onCheckedChange={setAddTextShadow} />
-                    </div>
-                    {addTextShadow && (
-                         <div className="space-y-4 border p-3 rounded-lg">
-                            <div className="space-y-2">
-                                <Label htmlFor="text-shadow-color">Shadow Color</Label>
-                                <Input id="text-shadow-color" type="color" value={textShadowColor} onChange={(e) => setTextShadowColor(e.target.value)} className="p-1 h-10"/>
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Shadow Blur: {textShadowBlur}px</Label>
-                                <Slider value={[textShadowBlur]} onValueChange={([val]) => setTextShadowBlur(val)} min={0} max={50} step={1} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Offset X: {textShadowOffsetX}px</Label>
-                                    <Slider value={[textShadowOffsetX]} onValueChange={([val]) => setTextShadowOffsetX(val)} min={-20} max={20} step={1} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Offset Y: {textShadowOffsetY}px</Label>
-                                    <Slider value={[textShadowOffsetY]} onValueChange={([val]) => setTextShadowOffsetY(val)} min={-20} max={20} step={1} />
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                                <Accordion type="single" collapsible className="w-full">
+                                    <AccordionItem value="text-style">
+                                        <AccordionTrigger>Styling</AccordionTrigger>
+                                        <AccordionContent className="space-y-4">
+                                            <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                                                <div className="space-y-0.5">
+                                                    <Label>Text Background</Label>
+                                                    <p className="text-xs text-muted-foreground">Improve readability.</p>
+                                                </div>
+                                                <Switch checked={layer.addTextBackground} onCheckedChange={(v) => handleLayerChange(layer.id, 'addTextBackground', v)} />
+                                            </div>
+                                            {layer.addTextBackground && (
+                                                <div className="space-y-2 border p-3 rounded-lg">
+                                                <Label htmlFor={`text-bg-color-${layer.id}`}>Text BG Color</Label>
+                                                <Input id={`text-bg-color-${layer.id}`} type="color" value={layer.textBackgroundColor} onChange={(e) => handleLayerChange(layer.id, 'textBackgroundColor', e.target.value)} className="p-1 h-10"/>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                                                <div className="space-y-0.5">
+                                                    <Label>Text Stroke</Label>
+                                                    <p className="text-xs text-muted-foreground">Add an outline to text.</p>
+                                                </div>
+                                                <Switch checked={layer.textStrokeWidth > 0} onCheckedChange={(checked) => handleLayerChange(layer.id, 'textStrokeWidth', checked ? 2 : 0)} />
+                                            </div>
+                                            {layer.textStrokeWidth > 0 && (
+                                                <div className="space-y-4 border p-3 rounded-lg">
+                                                    <div className="space-y-2">
+                                                        <Label>Stroke Width: {layer.textStrokeWidth}px</Label>
+                                                        <Slider value={[layer.textStrokeWidth]} onValueChange={([val]) => handleLayerChange(layer.id, 'textStrokeWidth', val)} min={0} max={20} step={1} />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor={`text-stroke-color-${layer.id}`}>Stroke Color</Label>
+                                                        <Input id={`text-stroke-color-${layer.id}`} type="color" value={layer.textStrokeColor} onChange={(e) => handleLayerChange(layer.id, 'textStrokeColor', e.target.value)} className="p-1 h-10"/>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                                                <div className="space-y-0.5">
+                                                    <Label>Text Shadow</Label>
+                                                    <p className="text-xs text-muted-foreground">Add a drop shadow.</p>
+                                                </div>
+                                                <Switch checked={layer.addTextShadow} onCheckedChange={(v) => handleLayerChange(layer.id, 'addTextShadow', v)} />
+                                            </div>
+                                            {layer.addTextShadow && (
+                                                <div className="space-y-4 border p-3 rounded-lg">
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor={`text-shadow-color-${layer.id}`}>Shadow Color</Label>
+                                                        <Input id={`text-shadow-color-${layer.id}`} type="color" value={layer.textShadowColor} onChange={(e) => handleLayerChange(layer.id, 'textShadowColor', e.target.value)} className="p-1 h-10"/>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Shadow Blur: {layer.textShadowBlur}px</Label>
+                                                        <Slider value={[layer.textShadowBlur]} onValueChange={([val]) => handleLayerChange(layer.id, 'textShadowBlur', val)} min={0} max={50} step={1} />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-2">
+                                                            <Label>Offset X: {layer.textShadowOffsetX}px</Label>
+                                                            <Slider value={[layer.textShadowOffsetX]} onValueChange={([val]) => handleLayerChange(layer.id, 'textShadowOffsetX', val)} min={-20} max={20} step={1} />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label>Offset Y: {layer.textShadowOffsetY}px</Label>
+                                                            <Slider value={[layer.textShadowOffsetY]} onValueChange={([val]) => handleLayerChange(layer.id, 'textShadowOffsetY', val)} min={-20} max={20} step={1} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                </Accordion>
+
+                                <Button variant="outline" size="sm" onClick={() => removeLayer(layer.id)} className="w-full">
+                                    <Trash2 className="mr-2 h-4 w-4" /> Remove Layer
+                                </Button>
+                            </AccordionContent>
+                        </AccordionItem>
+                     ))}
+                    </Accordion>
+                     <Button variant="outline" onClick={addLayer} className="w-full">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add Text Layer
+                    </Button>
                 </AccordionContent>
             </AccordionItem>
 
@@ -592,14 +628,33 @@ export function ImageEditor() {
           </CardHeader>
           <CardContent className="flex items-center justify-center bg-card-foreground/5 p-4">
             <div
-              className="w-full flex items-center justify-center shadow-lg"
+              className="w-full flex flex-col items-center justify-center shadow-lg relative"
               style={{ ...backgroundStyle, aspectRatio: `${previewDim.width} / ${previewDim.height}` }}
             >
-              <div style={textContainerStyle}>
-                <p style={textStyle}>
-                  {transformText(text, textCase)}
-                </p>
-              </div>
+              {textLayers.map(layer => {
+                  const textStyle: React.CSSProperties = {
+                    color: layer.textColor,
+                    fontSize: `${layer.fontSize / 32}rem`, // Scale font size for preview
+                    fontFamily: layer.fontFamily,
+                    textAlign: layer.textAlign as CanvasTextAlign,
+                    lineHeight: 1.2,
+                    whiteSpace: 'pre-wrap',
+                    padding: '1rem',
+                    wordBreak: 'break-word',
+                    letterSpacing: `${layer.letterSpacing / 32}rem`,
+                    WebkitTextStroke: layer.textStrokeWidth > 0 ? `${layer.textStrokeWidth / 16}rem ${layer.textStrokeColor}` : 'unset',
+                    textShadow: layer.addTextShadow ? `${layer.textShadowOffsetX/16}rem ${layer.textShadowOffsetY/16}rem ${layer.textShadowBlur/16}rem ${layer.textShadowColor}` : 'none',
+                    backgroundColor: layer.addTextBackground ? layer.textBackgroundColor : 'transparent',
+                    borderRadius: layer.addTextBackground ? '0.25rem' : 'none',
+                  };
+                  return (
+                     <div key={layer.id} style={{width: '100%', display: 'flex', justifyContent: 'center'}}>
+                        <p style={textStyle}>
+                            {layer.text}
+                        </p>
+                     </div>
+                  )
+              })}
             </div>
           </CardContent>
           <CardFooter>

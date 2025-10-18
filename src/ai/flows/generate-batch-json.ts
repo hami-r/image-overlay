@@ -46,12 +46,14 @@ const prompt = ai.definePrompt({
   output: {schema: GenerateBatchJsonOutputSchema},
   prompt: `You are an expert at creating JSON configurations for generating images.
 A user will provide a prompt, and you must generate a valid JSON array of objects based on their request.
+Each object in the array represents an image to be created and has a 'textLayers' property, which is an array of text layer objects.
 Each object in the array represents an image to be created and can have the following properties:
-- text: string (the main text for the overlay)
-- textColor: string (hex color code, e.g., "#FFFFFF")
-- fontSize: number (e.g., 64)
-- fontFamily: string (must be one of the available fonts)
-- textAlign: 'left' | 'center' | 'right'
+- textLayers: Array of objects, where each object can have:
+  - text: string (the main text for the overlay)
+  - textColor: string (hex color code, e.g., "#FFFFFF")
+  - fontSize: number (e.g., 64)
+  - fontFamily: string (must be one of the available fonts)
+  - textAlign: 'left' | 'center' | 'right'
 - background: string (hex color code or a CSS linear-gradient)
 - width: number (e.g., 1280)
 - height: number (e.g., 720)

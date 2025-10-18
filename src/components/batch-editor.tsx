@@ -33,24 +33,32 @@ import {
 
 const exampleJson = [
   {
-    "text": "Hello World",
-    "textColor": "#FFFFFF",
+    "textLayers": [
+      {
+        "text": "Hello World",
+        "textColor": "#FFFFFF",
+        "fontSize": 96,
+        "fontFamily": "'Inter', sans-serif",
+        "textAlign": "center"
+      }
+    ],
     "background": "linear-gradient(to right, #2b5876, #4e4376)",
-    "fontSize": 96,
     "width": 1280,
-    "height": 720,
-    "fontFamily": "'Inter', sans-serif",
-    "textAlign": "center"
+    "height": 720
   },
   {
-    "text": "Batch\nCreation\nRocks!",
-    "textColor": "#000000",
+    "textLayers": [
+      {
+        "text": "Batch Creation\nRocks!",
+        "textColor": "#000000",
+        "fontSize": 64,
+        "fontFamily": "'Playfair Display', serif",
+        "textAlign": "center"
+      }
+    ],
     "background": "#C1E1C1",
-    "fontSize": 64,
     "width": 1080,
-    "height": 1080,
-    "fontFamily": "'Playfair Display', serif",
-    "textAlign": "center"
+    "height": 1080
   }
 ];
 
@@ -106,7 +114,7 @@ const URLBackgroundInput = ({ index, onSetUrl }: { index: number, onSetUrl: (url
 const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground, onImageUpload, onImageUrl, onAiGenerateImage, generatingAiImageIndex, onApplyStylesToAll }: { 
     config: any, 
     index: number, 
-    onConfigChange: (field: string, value: any) => void, 
+    onConfigChange: (field: string, value: any, layerId?: number) => void, 
     onRemove: () => void,
     onRandomBackground: () => void,
     onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void,
@@ -116,24 +124,135 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
     onApplyStylesToAll: () => void
 }) => {
     const isGeneratingThis = generatingAiImageIndex === index;
+    const { textLayers = [] } = config;
+
+    const addLayer = () => {
+        const newLayer = {
+            id: Date.now(),
+            text: 'New Layer',
+            textColor: '#000000',
+            fontSize: 64,
+            fontFamily: "'Inter', sans-serif",
+            textAlign: 'center',
+        };
+        onConfigChange('textLayers', [...textLayers, newLayer]);
+    }
+    
+    const removeLayer = (layerId: number) => {
+        if (textLayers.length > 1) {
+            onConfigChange('textLayers', textLayers.filter((l: any) => l.id !== layerId));
+        }
+    }
+
     return (
         <AccordionItem value={`item-${index}`}>
             <AccordionTrigger>
-                <span className="truncate">Image {index + 1}: {config.text || "Untitled"}</span>
+                <span className="truncate">Image {index + 1}: {textLayers[0]?.text || "Untitled"}</span>
             </AccordionTrigger>
             <AccordionContent>
-                    <div className="space-y-4 p-4 pr-2">
-                    <div className="space-y-2">
-                        <Label htmlFor={`text-${index}`}>Text</Label>
-                        <Textarea id={`text-${index}`} value={config.text} onChange={(e) => onConfigChange('text', e.target.value)} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor={`text-color-${index}`}>Text Color</Label>
-                            <Input id={`text-color-${index}`} type="color" value={config.textColor || '#000000'} onChange={(e) => onConfigChange('textColor', e.target.value)} className="p-1 h-10"/>
-                        </div>
-                    </div>
-
+                <div className="space-y-4 p-4 pr-2">
+                    <Accordion type="multiple" defaultValue={[`layer-0`]} className="w-full">
+                        {textLayers.map((layer: any, layerIndex: number) => (
+                           <AccordionItem key={layer.id || layerIndex} value={`layer-${layerIndex}`}>
+                                <AccordionTrigger>Layer {layerIndex + 1}: {layer.text}</AccordionTrigger>
+                                <AccordionContent className="space-y-4 pt-4">
+                                     <div className="space-y-2">
+                                        <Label htmlFor={`text-${index}-${layerIndex}`}>Text</Label>
+                                        <Textarea id={`text-${index}-${layerIndex}`} value={layer.text} onChange={(e) => onConfigChange('text', e.target.value, layer.id)} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`text-color-${index}-${layerIndex}`}>Text Color</Label>
+                                            <Input id={`text-color-${index}-${layerIndex}`} type="color" value={layer.textColor || '#000000'} onChange={(e) => onConfigChange('textColor', e.target.value, layer.id)} className="p-1 h-10"/>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Font</Label>
+                                        <Select value={layer.fontFamily} onValueChange={(v) => onConfigChange('fontFamily', v, layer.id)}>
+                                            <SelectTrigger><SelectValue/></SelectTrigger>
+                                            <SelectContent>
+                                                {fontFamilies.map(f => <SelectItem key={f.name} value={f.family} style={{fontFamily: f.family}}>{f.name}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                            <Label htmlFor={`font-size-${index}-${layerIndex}`}>Font Size</Label>
+                                            <Input id={`font-size-${index}-${layerIndex}`} type="number" value={layer.fontSize} onChange={(e) => onConfigChange('fontSize', e.target.value, layer.id)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Alignment</Label>
+                                            <ToggleGroup type="single" value={layer.textAlign} onValueChange={(v) => v && onConfigChange('textAlign', v, layer.id)} className="w-full">
+                                                <ToggleGroupItem value="left" className="w-full"><AlignLeft/></ToggleGroupItem>
+                                                <ToggleGroupItem value="center" className="w-full"><AlignCenter/></ToggleGroupItem>
+                                                <ToggleGroupItem value="right" className="w-full"><AlignRight/></ToggleGroupItem>
+                                            </ToggleGroup>
+                                        </div>
+                                    </div>
+                                    <Accordion type="single" collapsible className="w-full">
+                                        <AccordionItem value="advanced-style">
+                                            <AccordionTrigger>Advanced Styling</AccordionTrigger>
+                                            <AccordionContent className="space-y-4 pt-4">
+                                                <div className="space-y-2">
+                                                    <Label>Letter Spacing: {layer.letterSpacing || 0}px</Label>
+                                                    <Slider value={[layer.letterSpacing || 0]} onValueChange={([val]) => onConfigChange('letterSpacing', val, layer.id)} min={-10} max={50} step={1} />
+                                                </div>
+                                                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                                                    <div className="space-y-0.5">
+                                                        <Label>Text Stroke</Label>
+                                                    </div>
+                                                    <Switch checked={layer.textStrokeWidth > 0} onCheckedChange={(checked) => onConfigChange('textStrokeWidth', checked ? 2 : 0, layer.id)} />
+                                                </div>
+                                                {layer.textStrokeWidth > 0 && (
+                                                    <div className="space-y-4 border p-3 rounded-lg">
+                                                        <div className="space-y-2">
+                                                            <Label>Stroke Width: {layer.textStrokeWidth}px</Label>
+                                                            <Slider value={[layer.textStrokeWidth]} onValueChange={([val]) => onConfigChange('textStrokeWidth', val, layer.id)} min={0} max={20} step={1} />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor={`text-stroke-color-${index}-${layerIndex}`}>Stroke Color</Label>
+                                                            <Input id={`text-stroke-color-${index}-${layerIndex}`} type="color" value={layer.textStrokeColor || '#000000'} onChange={(e) => onConfigChange('textStrokeColor', e.target.value, layer.id)} className="p-1 h-10"/>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                                                    <div className="space-y-0.5">
+                                                        <Label>Text Shadow</Label>
+                                                    </div>
+                                                    <Switch checked={layer.addTextShadow} onCheckedChange={(checked) => onConfigChange('addTextShadow', checked, layer.id)} />
+                                                </div>
+                                                {layer.addTextShadow && (
+                                                    <div className="space-y-4 border p-3 rounded-lg">
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor={`text-shadow-color-${index}-${layerIndex}`}>Shadow Color</Label>
+                                                            <Input id={`text-shadow-color-${index}-${layerIndex}`} type="color" value={layer.textShadowColor || '#000000'} onChange={(e) => onConfigChange('textShadowColor', e.target.value, layer.id)} className="p-1 h-10"/>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label>Shadow Blur: {layer.textShadowBlur || 10}px</Label>
+                                                            <Slider value={[layer.textShadowBlur || 10]} onValueChange={([val]) => onConfigChange('textShadowBlur', val, layer.id)} min={0} max={50} step={1} />
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div className="space-y-2">
+                                                                <Label>Offset X: {layer.textShadowOffsetX || 5}px</Label>
+                                                                <Slider value={[layer.textShadowOffsetX || 5]} onValueChange={([val]) => onConfigChange('textShadowOffsetX', val, layer.id)} min={-20} max={20} step={1} />
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <Label>Offset Y: {layer.textShadowOffsetY || 5}px</Label>
+                                                                <Slider value={[layer.textShadowOffsetY || 5]} onValueChange={([val]) => onConfigChange('textShadowOffsetY', val, layer.id)} min={-20} max={20} step={1} />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    </Accordion>
+                                    <Button variant="outline" size="sm" onClick={() => removeLayer(layer.id)}><Trash2 className="h-4 w-4 mr-2"/> Remove Layer</Button>
+                                </AccordionContent>
+                           </AccordionItem>
+                        ))}
+                    </Accordion>
+                    <Button variant="outline" onClick={addLayer}><PlusCircle className="h-4 w-4 mr-2"/> Add Text Layer</Button>
+                    
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
                             <Label>Background</Label>
@@ -173,30 +292,7 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
                             </TabsContent>
                         </Tabs>
                     </div>
-                    
-                    <div className="space-y-2">
-                        <Label>Font</Label>
-                        <Select value={config.fontFamily} onValueChange={(v) => onConfigChange('fontFamily', v)}>
-                            <SelectTrigger><SelectValue/></SelectTrigger>
-                            <SelectContent>
-                                {fontFamilies.map(f => <SelectItem key={f.name} value={f.family} style={{fontFamily: f.family}}>{f.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                            <Label htmlFor={`font-size-${index}`}>Font Size</Label>
-                            <Input id={`font-size-${index}`} type="number" value={config.fontSize} onChange={(e) => onConfigChange('fontSize', e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Alignment</Label>
-                            <ToggleGroup type="single" value={config.textAlign} onValueChange={(v) => v && onConfigChange('textAlign', v)} className="w-full">
-                                <ToggleGroupItem value="left" className="w-full"><AlignLeft/></ToggleGroupItem>
-                                <ToggleGroupItem value="center" className="w-full"><AlignCenter/></ToggleGroupItem>
-                                <ToggleGroupItem value="right" className="w-full"><AlignRight/></ToggleGroupItem>
-                            </ToggleGroup>
-                        </div>
-                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                             <Label htmlFor={`width-${index}`}>Width</Label>
@@ -207,67 +303,6 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
                             <Input id={`height-${index}`} type="number" value={config.height} onChange={(e) => onConfigChange('height', e.target.value)} />
                         </div>
                     </div>
-
-                    {/* Advanced Styling */}
-                    <Accordion type="single" collapsible className="w-full">
-                        <AccordionItem value="advanced-style">
-                            <AccordionTrigger>Advanced Styling</AccordionTrigger>
-                            <AccordionContent className="space-y-4 pt-4">
-                                    <div className="space-y-2">
-                                    <Label>Letter Spacing: {config.letterSpacing || 0}px</Label>
-                                    <Slider value={[config.letterSpacing || 0]} onValueChange={([val]) => onConfigChange('letterSpacing', val)} min={-10} max={50} step={1} />
-                                </div>
-
-                                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                                    <div className="space-y-0.5">
-                                        <Label>Text Stroke</Label>
-                                    </div>
-                                    <Switch checked={config.textStrokeWidth > 0} onCheckedChange={(checked) => onConfigChange('textStrokeWidth', checked ? 2 : 0)} />
-                                </div>
-                                {config.textStrokeWidth > 0 && (
-                                    <div className="space-y-4 border p-3 rounded-lg">
-                                        <div className="space-y-2">
-                                            <Label>Stroke Width: {config.textStrokeWidth}px</Label>
-                                            <Slider value={[config.textStrokeWidth]} onValueChange={([val]) => onConfigChange('textStrokeWidth', val)} min={0} max={20} step={1} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor={`text-stroke-color-${index}`}>Stroke Color</Label>
-                                            <Input id={`text-stroke-color-${index}`} type="color" value={config.textStrokeColor || '#000000'} onChange={(e) => onConfigChange('textStrokeColor', e.target.value)} className="p-1 h-10"/>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                                    <div className="space-y-0.5">
-                                        <Label>Text Shadow</Label>
-                                    </div>
-                                    <Switch checked={config.addTextShadow} onCheckedChange={(checked) => onConfigChange('addTextShadow', checked)} />
-                                </div>
-                                {config.addTextShadow && (
-                                    <div className="space-y-4 border p-3 rounded-lg">
-                                        <div className="space-y-2">
-                                            <Label htmlFor={`text-shadow-color-${index}`}>Shadow Color</Label>
-                                            <Input id={`text-shadow-color-${index}`} type="color" value={config.textShadowColor || '#000000'} onChange={(e) => onConfigChange('textShadowColor', e.target.value)} className="p-1 h-10"/>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Shadow Blur: {config.textShadowBlur || 10}px</Label>
-                                            <Slider value={[config.textShadowBlur || 10]} onValueChange={([val]) => onConfigChange('textShadowBlur', val)} min={0} max={50} step={1} />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label>Offset X: {config.textShadowOffsetX || 5}px</Label>
-                                                <Slider value={[config.textShadowOffsetX || 5]} onValueChange={([val]) => onConfigChange('textShadowOffsetX', val)} min={-20} max={20} step={1} />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label>Offset Y: {config.textShadowOffsetY || 5}px</Label>
-                                                <Slider value={[config.textShadowOffsetY || 5]} onValueChange={([val]) => onConfigChange('textShadowOffsetY', val)} min={-20} max={20} step={1} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
 
                     <div className="flex gap-2 pt-4">
                         <Button variant="outline" size="sm" onClick={onRemove}>
@@ -310,7 +345,7 @@ export function BatchEditor() {
         try {
             const parsed = JSON.parse(jsonInput);
             if (Array.isArray(parsed)) {
-                setConfigs(parsed);
+                setConfigs(parsed.map(c => ({...c, textLayers: c.textLayers || [{ text: c.text, id: Date.now() }]})));
                 setJsonError(null);
             } else {
                 setJsonError("Input must be a JSON array.");
@@ -325,7 +360,7 @@ export function BatchEditor() {
     useEffect(() => {
         // Sync configs back to JSON input if there's no error
         if (!jsonError) {
-             const newJson = JSON.stringify(configs, null, 2);
+             const newJson = JSON.stringify(configs, (key, value) => key === 'id' ? undefined : value, 2);
              if (newJson !== jsonInput) {
                  // To prevent infinite loops, only update if the stringified version is different
                  // and the parsed versions are also different (deep check is too slow)
@@ -404,7 +439,7 @@ export function BatchEditor() {
                 title: "JSON Generated",
                 description: "The configuration has been updated with the AI's response.",
             });
-        } catch (error: any) {
+        } catch (error: any)
             console.error("AI JSON Generation Error:", error);
             const description = error.message.includes('JSON.parse')
                 ? "The AI returned invalid JSON. Please try again."
@@ -460,30 +495,17 @@ export function BatchEditor() {
             if (!ctx) return reject(new Error("Could not get canvas context."));
 
             const {
-                text = "Missing Text",
-                textColor = "#000000",
-                fontSize = 64,
-                fontFamily = "'Inter', sans-serif",
-                textAlign = "center",
+                textLayers = [{ text: "Missing Text", textColor: "#000000", fontSize: 64, fontFamily: "'Inter', sans-serif" }],
                 background = "#FFFFFF",
                 backgroundImage,
                 width = 1280,
                 height = 720,
-                letterSpacing = 0,
-                addTextShadow = false,
-                textShadowColor = 'rgba(0,0,0,0.5)',
-                textShadowBlur = 10,
-                textShadowOffsetX = 5,
-                textShadowOffsetY = 5,
-                textStrokeWidth = 0,
-                textStrokeColor = '#000000',
             } = config;
 
             canvas.width = width;
             canvas.height = height;
 
             const drawBackground = new Promise<void>((resolve) => {
-                // Clear canvas with a neutral color first
                 ctx.fillStyle = '#FFFFFF';
                 ctx.fillRect(0, 0, width, height);
 
@@ -494,32 +516,20 @@ export function BatchEditor() {
                     resolve();
                 };
                 img.onerror = () => {
-                    console.error(`Failed to load background image for item ${index}: ${backgroundImage}`);
-                    // Draw color/gradient background if image fails
-                     if (background.includes('gradient')) {
+                    if (background.includes('gradient')) {
                          const colors = background.match(/#(?:[0-9a-fA-F]{3}){1,2}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)|hsl\(\s*\d+\s*,\s*[\d.]+\%\s*,\s*[\d.]+\%\s*\)/g);
                         if(colors && colors.length >= 2) {
                             const directionMatch = background.match(/to (right|left|bottom|top|bottom right|bottom left|top left|top right)/);
                             const direction = directionMatch ? directionMatch[1] : 'right';
                             let gradient;
-
-                            if (direction === 'right') {
-                                 gradient = ctx.createLinearGradient(0, 0, width, 0);
-                            } else if (direction === 'left') {
-                                gradient = ctx.createLinearGradient(width, 0, 0, 0);
-                            } else if (direction === 'bottom') {
-                                gradient = ctx.createLinearGradient(0, 0, 0, height);
-                            } else if (direction === 'bottom right') {
-                                gradient = ctx.createLinearGradient(0, 0, width, height);
-                            } else if (direction === 'bottom left') {
-                                gradient = ctx.createLinearGradient(width, 0, 0, height);
-                            } else if (direction === 'top left') {
-                                gradient = ctx.createLinearGradient(width, height, 0, 0);
-                            } else if (direction === 'top right') {
-                                gradient = ctx.createLinearGradient(0, height, width, 0);
-                            } else { // top
-                                gradient = ctx.createLinearGradient(0, height, 0, 0);
-                            }
+                            if (direction === 'right') gradient = ctx.createLinearGradient(0, 0, width, 0);
+                            else if (direction === 'left') gradient = ctx.createLinearGradient(width, 0, 0, 0);
+                            else if (direction === 'bottom') gradient = ctx.createLinearGradient(0, 0, 0, height);
+                            else if (direction === 'bottom right') gradient = ctx.createLinearGradient(0, 0, width, height);
+                            else if (direction === 'bottom left') gradient = ctx.createLinearGradient(width, 0, 0, height);
+                            else if (direction === 'top left') gradient = ctx.createLinearGradient(width, height, 0, 0);
+                            else if (direction === 'top right') gradient = ctx.createLinearGradient(0, height, width, 0);
+                            else gradient = ctx.createLinearGradient(0, height, 0, 0);
                             gradient.addColorStop(0, colors[0]);
                             gradient.addColorStop(1, colors[1]);
                             ctx.fillStyle = gradient;
@@ -536,51 +546,74 @@ export function BatchEditor() {
                 if (backgroundImage) {
                     img.src = backgroundImage;
                 } else {
-                    img.onerror(); // Trigger fallback if no image src
+                    img.onerror(); 
                 }
             });
 
             drawBackground.then(() => {
-                // Draw text
-                ctx.font = `${fontSize}px ${fontFamily}`;
-                ctx.fillStyle = textColor;
-                ctx.textAlign = textAlign as CanvasTextAlign;
-                ctx.textBaseline = 'middle';
-                ctx.letterSpacing = `${letterSpacing}px`;
+                let totalTextHeight = 0;
+                const layerLineHeights: { [key: number]: number[] } = {};
+        
+                textLayers.forEach((layer: any, layerIndex: number) => {
+                    const lineHeight = (layer.fontSize || 64) * 1.2;
+                    ctx.font = `${layer.fontSize || 64}px ${layer.fontFamily || "'Inter', sans-serif"}`;
+                    const lines = wrapText(ctx, layer.text, width - 80);
+                    layerLineHeights[layerIndex] = Array(lines.length).fill(lineHeight);
+                    totalTextHeight += lines.length * lineHeight;
+                });
+                
+                let currentY = (height - totalTextHeight) / 2;
 
-                if (addTextShadow) {
-                    ctx.shadowColor = textShadowColor;
-                    ctx.shadowBlur = textShadowBlur;
-                    ctx.shadowOffsetX = textShadowOffsetX;
-                    ctx.shadowOffsetY = textShadowOffsetY;
-                }
-
-                const padding = 80;
-                const maxTextWidth = width - padding;
-                const lines = wrapText(ctx, text, maxTextWidth);
-
-                const lineHeight = fontSize * 1.2;
-                const totalTextHeight = (lines.length - 1) * lineHeight;
-                let startY = (height - totalTextHeight) / 2;
-
-                lines.forEach((line: string, lineIndex: number) => {
-                    const y = startY + lineIndex * lineHeight;
-                    let x;
-                    switch (textAlign) {
-                        case 'left': x = padding / 2; break;
-                        case 'right': x = width - (padding / 2); break;
-                        case 'center': default: x = width / 2; break;
-                    }
+                textLayers.forEach((layer: any, layerIndex: number) => {
+                    const {
+                        text, textColor = '#000000', fontSize = 64, fontFamily = "'Inter', sans-serif",
+                        textAlign = 'center', letterSpacing = 0, addTextShadow = false,
+                        textShadowColor = 'rgba(0,0,0,0.5)', textShadowBlur = 10,
+                        textShadowOffsetX = 5, textShadowOffsetY = 5, textStrokeWidth = 0,
+                        textStrokeColor = '#000000',
+                    } = layer;
                     
-                    if (textStrokeWidth > 0) {
-                        ctx.strokeStyle = textStrokeColor;
-                        ctx.lineWidth = textStrokeWidth;
-                        ctx.strokeText(line, x, y);
+                    ctx.font = `${fontSize}px ${fontFamily}`;
+                    ctx.fillStyle = textColor;
+                    ctx.textAlign = textAlign as CanvasTextAlign;
+                    ctx.textBaseline = 'middle';
+                    ctx.letterSpacing = `${letterSpacing}px`;
+
+                    if (addTextShadow) {
+                        ctx.shadowColor = textShadowColor;
+                        ctx.shadowBlur = textShadowBlur;
+                        ctx.shadowOffsetX = textShadowOffsetX;
+                        ctx.shadowOffsetY = textShadowOffsetY;
+                    } else {
+                        ctx.shadowColor = 'transparent';
                     }
-                    ctx.fillText(line, x, y);
+
+                    const padding = 80;
+                    const maxTextWidth = width - padding;
+                    const lines = wrapText(ctx, text, maxTextWidth);
+
+                    const lineHeights = layerLineHeights[layerIndex];
+
+                    lines.forEach((line: string, lineIndex: number) => {
+                        const lineHeight = lineHeights[lineIndex];
+                        const y = currentY + (lineHeight / 2);
+                        let x;
+                        switch (textAlign) {
+                            case 'left': x = padding / 2; break;
+                            case 'right': x = width - (padding / 2); break;
+                            case 'center': default: x = width / 2; break;
+                        }
+                        
+                        if (textStrokeWidth > 0) {
+                            ctx.strokeStyle = textStrokeColor;
+                            ctx.lineWidth = textStrokeWidth;
+                            ctx.strokeText(line, x, y);
+                        }
+                        ctx.fillText(line, x, y);
+                        currentY += lineHeight;
+                    });
                 });
 
-                // Trigger download
                 const link = document.createElement('a');
                 link.download = `image_${index}.png`;
                 link.href = canvas.toDataURL('image/png');
@@ -590,12 +623,30 @@ export function BatchEditor() {
         });
     };
 
-    const handleConfigChange = (index: number, field: string, value: any) => {
+    const handleConfigChange = (index: number, field: string, value: any, layerId?: number) => {
         const newConfigs = [...configs];
-        let newConfig = { ...newConfigs[index], [field]: value };
+        let newConfig = { ...newConfigs[index] };
+        
+        if (field === 'textLayers' || layerId !== undefined) {
+            if (layerId !== undefined) {
+                 newConfig.textLayers = newConfig.textLayers.map((l:any) => 
+                     l.id === layerId ? { ...l, [field]: value } : l
+                 );
+            } else {
+                newConfig.textLayers = value;
+            }
+        } else {
+            newConfig[field] = value;
+        }
         
         if (["fontSize", "width", "height", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY"].includes(field)) {
-            newConfig[field] = Number(value);
+             if (layerId) {
+                  newConfig.textLayers = newConfig.textLayers.map((l:any) => 
+                     l.id === layerId ? { ...l, [field]: Number(value) } : l
+                 );
+             } else {
+                 newConfig[field] = Number(value);
+             }
         }
 
         if (field === "background") {
@@ -713,14 +764,17 @@ export function BatchEditor() {
         setConfigs([
             ...configs,
             {
-                "text": "New Image",
-                "textColor": "#000000",
+                "textLayers": [{
+                    id: Date.now(),
+                    "text": "New Image",
+                    "textColor": "#000000",
+                    "fontSize": 64,
+                    "fontFamily": "'Inter', sans-serif",
+                    "textAlign": "center"
+                }],
                 "background": "#FFFFFF",
-                "fontSize": 64,
                 "width": 1280,
                 "height": 720,
-                "fontFamily": "'Inter', sans-serif",
-                "textAlign": "center"
             }
         ]);
     };
@@ -774,12 +828,14 @@ export function BatchEditor() {
 
         const sourceConfig = configs[styleSourceIndex];
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { text, ...sourceStyles } = sourceConfig;
+        const { text, textLayers, ...sourceStyles } = sourceConfig;
 
         if (!includeBackground) {
             delete sourceStyles.background;
             delete sourceStyles.backgroundImage;
         }
+        
+        const sourceLayerStyles = textLayers[0] ? (({ text, ...rest }) => rest)(textLayers[0]) : {};
 
         const newConfigs = configs.map((config, index) => {
             if (index === styleSourceIndex) {
@@ -788,6 +844,7 @@ export function BatchEditor() {
             return {
                 ...config,
                 ...sourceStyles,
+                textLayers: config.textLayers.map((layer:any) => ({...layer, ...sourceLayerStyles}))
             };
         });
 
@@ -801,23 +858,11 @@ export function BatchEditor() {
 
     const renderPreview = (config: any, index: number) => {
          const {
-            text = "Missing Text",
-            textColor = "#000000",
-            fontSize = 64,
-            fontFamily = "'Inter', sans-serif",
-            textAlign = "center",
+            textLayers = [],
             background = "#FFFFFF",
             backgroundImage,
             width = 1280,
             height = 720,
-            letterSpacing = 0,
-            addTextShadow = false,
-            textShadowColor = 'rgba(0,0,0,0.5)',
-            textShadowBlur = 10,
-            textShadowOffsetX = 5,
-            textShadowOffsetY = 5,
-            textStrokeWidth = 0,
-            textStrokeColor = '#000000',
         } = config;
         
         const backgroundStyle: React.CSSProperties = backgroundImage ? {
@@ -830,30 +875,50 @@ export function BatchEditor() {
             background: background,
           };
 
-        const textStyle: React.CSSProperties = {
-            color: textColor,
-            fontSize: `${fontSize / 32}rem`,
-            fontFamily: fontFamily,
-            textAlign: textAlign as CanvasTextAlign,
-            lineHeight: 1.2,
-            whiteSpace: 'pre-wrap',
-            padding: '1rem',
-            wordBreak: 'break-word',
-            letterSpacing: `${letterSpacing / 32}rem`,
-            WebkitTextStroke: textStrokeWidth > 0 ? `${textStrokeWidth / 16}rem ${textStrokeColor}` : 'unset',
-            textShadow: addTextShadow ? `${textShadowOffsetX/16}rem ${textShadowOffsetY/16}rem ${textShadowBlur/16}rem ${textShadowColor}` : 'none',
-        };
-
         return (
             <div key={index} className="flex flex-col gap-2">
                 <p className="text-sm font-medium text-muted-foreground">Preview {index + 1}</p>
                 <div 
-                    className="w-full flex items-center justify-center shadow-lg rounded-md bg-card-foreground/5"
+                    className="w-full flex flex-col items-center justify-center shadow-lg rounded-md bg-card-foreground/5"
                     style={{ ...backgroundStyle, aspectRatio: `${width} / ${height}` }}
                 >
-                    <div>
-                        <p style={textStyle}>{text}</p>
-                    </div>
+                    {textLayers.map((layer:any, i:number) => {
+                        const {
+                            text = "Missing Text",
+                            textColor = "#000000",
+                            fontSize = 64,
+                            fontFamily = "'Inter', sans-serif",
+                            textAlign = "center",
+                            letterSpacing = 0,
+                            addTextShadow = false,
+                            textShadowColor = 'rgba(0,0,0,0.5)',
+                            textShadowBlur = 10,
+                            textShadowOffsetX = 5,
+                            textShadowOffsetY = 5,
+                            textStrokeWidth = 0,
+                            textStrokeColor = '#000000',
+                        } = layer;
+                        
+                        const textStyle: React.CSSProperties = {
+                            color: textColor,
+                            fontSize: `${fontSize / 32}rem`,
+                            fontFamily: fontFamily,
+                            textAlign: textAlign as CanvasTextAlign,
+                            lineHeight: 1.2,
+                            whiteSpace: 'pre-wrap',
+                            padding: '1rem',
+                            wordBreak: 'break-word',
+                            letterSpacing: `${letterSpacing / 32}rem`,
+                            WebkitTextStroke: textStrokeWidth > 0 ? `${textStrokeWidth / 16}rem ${textStrokeColor}` : 'unset',
+                            textShadow: addTextShadow ? `${textShadowOffsetX/16}rem ${textShadowOffsetY/16}rem ${textShadowBlur/16}rem ${textShadowColor}` : 'none',
+                        };
+
+                        return (
+                             <div key={i} style={{width: '100%', display: 'flex', justifyContent: 'center'}}>
+                                <p style={textStyle}>{text}</p>
+                            </div>
+                        )
+                    })}
                 </div>
             </div>
         )
@@ -917,7 +982,7 @@ export function BatchEditor() {
                         key={index}
                         config={config}
                         index={index}
-                        onConfigChange={(field, value) => handleConfigChange(index, field, value)}
+                        onConfigChange={(field, value, layerId) => handleConfigChange(index, field, value, layerId)}
                         onRemove={() => handleRemoveImage(index)}
                         onRandomBackground={() => handleRandomBackground(index)}
                         onImageUpload={(e) => handleImageUpload(index, e)}
@@ -1034,7 +1099,3 @@ export function BatchEditor() {
         </div>
     );
 }
-
-    
-
-    

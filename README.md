@@ -84,6 +84,7 @@ Each object in the `textLayers` array defines a block of text and has the follow
         "text": "Batch\nCreation\nRocks!",
         "textColor": "#000000",
         "fontSize": 96,
+        "fontFamily": "'Playfair Display', serif",
         "addTextShadow": true,
         "textShadowBlur": 5
       },
@@ -91,7 +92,7 @@ Each object in the `textLayers` array defines a block of text and has the follow
         "text": "So easy!",
         "textColor": "#333333",
         "fontSize": 48,
-        "fontFamily": "'Playfair Display', serif",
+        "fontFamily": "'Inter', sans-serif",
         "textStrokeWidth": 1,
         "textStrokeColor": "#FFFFFF"
       }
@@ -103,3 +104,5 @@ Each object in the `textLayers` array defines a block of text and has the follow
   }
 ]
 ```
+
+    

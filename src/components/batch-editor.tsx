@@ -35,11 +35,16 @@ const exampleJson = [
   {
     "textLayers": [
       {
-        "text": "Hello World",
+        "text": "Welcome to the Future",
         "textColor": "#FFFFFF",
         "fontSize": 96,
-        "fontFamily": "'Inter', sans-serif",
-        "textAlign": "center"
+        "fontFamily": "'Inter', sans-serif"
+      },
+      {
+        "text": "A new era of design.",
+        "textColor": "#DDDDDD",
+        "fontSize": 32,
+        "fontFamily": "'Inter', sans-serif"
       }
     ],
     "background": "linear-gradient(to right, #2b5876, #4e4376)",
@@ -49,11 +54,16 @@ const exampleJson = [
   {
     "textLayers": [
       {
-        "text": "Batch Creation\nRocks!",
+        "text": "Product Launch",
         "textColor": "#000000",
-        "fontSize": 64,
+        "fontSize": 80,
         "fontFamily": "'Playfair Display', serif",
-        "textAlign": "center"
+        "addTextShadow": true
+      },
+      {
+        "text": "Coming Soon",
+        "textColor": "#333333",
+        "fontSize": 40
       }
     ],
     "background": "#C1E1C1",
@@ -345,7 +355,7 @@ export function BatchEditor() {
         try {
             const parsed = JSON.parse(jsonInput);
             if (Array.isArray(parsed)) {
-                setConfigs(parsed.map(c => ({...c, textLayers: c.textLayers || [{ text: c.text, id: Date.now() }]})));
+                setConfigs(parsed.map(c => ({...c, textLayers: c.textLayers && c.textLayers.length > 0 ? c.textLayers.map((l: any, i: number) => ({...l, id: l.id || Date.now() + i})) : [{ text: c.text || "Missing Text", id: Date.now() }]})));
                 setJsonError(null);
             } else {
                 setJsonError("Input must be a JSON array.");
@@ -365,7 +375,7 @@ export function BatchEditor() {
                  // To prevent infinite loops, only update if the stringified version is different
                  // and the parsed versions are also different (deep check is too slow)
                  try {
-                    if (JSON.stringify(JSON.parse(jsonInput), null, 2) !== newJson) {
+                    if (JSON.stringify(JSON.parse(jsonInput), (key, value) => key === 'id' ? undefined : value, 2) !== newJson) {
                        setJsonInput(newJson);
                     }
                  } catch (e) {
@@ -552,13 +562,15 @@ export function BatchEditor() {
 
             drawBackground.then(() => {
                 let totalTextHeight = 0;
-                const layerLineHeights: { [key: number]: number[] } = {};
+                const layerLineHeights: { [key: number]: number } = {};
+                const allLines: string[][] = [];
         
                 textLayers.forEach((layer: any, layerIndex: number) => {
                     const lineHeight = (layer.fontSize || 64) * 1.2;
                     ctx.font = `${layer.fontSize || 64}px ${layer.fontFamily || "'Inter', sans-serif"}`;
                     const lines = wrapText(ctx, layer.text, width - 80);
-                    layerLineHeights[layerIndex] = Array(lines.length).fill(lineHeight);
+                    allLines.push(lines);
+                    layerLineHeights[layerIndex] = lineHeight;
                     totalTextHeight += lines.length * lineHeight;
                 });
                 
@@ -576,7 +588,6 @@ export function BatchEditor() {
                     ctx.font = `${fontSize}px ${fontFamily}`;
                     ctx.fillStyle = textColor;
                     ctx.textAlign = textAlign as CanvasTextAlign;
-                    ctx.textBaseline = 'middle';
                     ctx.letterSpacing = `${letterSpacing}px`;
 
                     if (addTextShadow) {
@@ -586,16 +597,17 @@ export function BatchEditor() {
                         ctx.shadowOffsetY = textShadowOffsetY;
                     } else {
                         ctx.shadowColor = 'transparent';
+                        ctx.shadowBlur = 0;
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 0;
                     }
 
                     const padding = 80;
                     const maxTextWidth = width - padding;
-                    const lines = wrapText(ctx, text, maxTextWidth);
-
-                    const lineHeights = layerLineHeights[layerIndex];
+                    const lines = allLines[layerIndex];
+                    const lineHeight = layerLineHeights[layerIndex];
 
                     lines.forEach((line: string, lineIndex: number) => {
-                        const lineHeight = lineHeights[lineIndex];
                         const y = currentY + (lineHeight / 2);
                         let x;
                         switch (textAlign) {
@@ -628,9 +640,16 @@ export function BatchEditor() {
         let newConfig = { ...newConfigs[index] };
         
         if (field === 'textLayers' || layerId !== undefined) {
-            if (layerId !== undefined) {
+             let targetLayerId = layerId;
+             // Find layer by index if id is missing
+            if (layerId === undefined) {
+                const layerIndex = newConfig.textLayers.findIndex((l:any) => l.id === undefined);
+                if (layerIndex !== -1) targetLayerId = newConfig.textLayers[layerIndex].id;
+            }
+
+            if (targetLayerId !== undefined) {
                  newConfig.textLayers = newConfig.textLayers.map((l:any) => 
-                     l.id === layerId ? { ...l, [field]: value } : l
+                     l.id === targetLayerId ? { ...l, [field]: value } : l
                  );
             } else {
                 newConfig.textLayers = value;
@@ -640,7 +659,7 @@ export function BatchEditor() {
         }
         
         if (["fontSize", "width", "height", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY"].includes(field)) {
-             if (layerId) {
+             if (layerId !== undefined) {
                   newConfig.textLayers = newConfig.textLayers.map((l:any) => 
                      l.id === layerId ? { ...l, [field]: Number(value) } : l
                  );
@@ -1098,3 +1117,5 @@ export function BatchEditor() {
         </div>
     );
 }
+
+    

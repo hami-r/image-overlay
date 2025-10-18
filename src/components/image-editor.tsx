@@ -414,11 +414,11 @@ export function ImageEditor() {
                                  <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor={`layer-x-${layer.id}`}>Position X</Label>
-                                        <Input id={`layer-x-${layer.id}`} type="number" placeholder={`${previewDim.width/2}`} value={layer.x || ''} onChange={(e) => handleLayerChange(layer.id, 'x', e.target.value)} />
+                                        <Input id={`layer-x-${layer.id}`} type="number" placeholder={`${previewDim.width/2}`} value={layer.x ?? ''} onChange={(e) => handleLayerChange(layer.id, 'x', e.target.value)} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor={`layer-y-${layer.id}`}>Position Y</Label>
-                                        <Input id={`layer-y-${layer.id}`} type="number" placeholder={`${previewDim.height/2}`} value={layer.y || ''} onChange={(e) => handleLayerChange(layer.id, 'y', e.target.value)} />
+                                        <Input id={`layer-y-${layer.id}`} type="number" placeholder={`${previewDim.height/2}`} value={layer.y ?? ''} onChange={(e) => handleLayerChange(layer.id, 'y', e.target.value)} />
                                     </div>
                                 </div>
                                 <div className="space-y-2">

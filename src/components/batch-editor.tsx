@@ -264,17 +264,17 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label htmlFor={`layer-x-${index}-${layerIndex}`}>Position X</Label>
-                                            <Input id={`layer-x-${index}-${layerIndex}`} type="number" placeholder={`${config.width/2 || 640}`} value={layer.x || ''} onChange={(e) => onConfigChange('x', e.target.value, layer.id)} />
+                                            <Input id={`layer-x-${index}-${layerIndex}`} type="number" placeholder={`${config.width/2 || 640}`} value={layer.x ?? ''} onChange={(e) => onConfigChange('x', e.target.value, layer.id)} />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor={`layer-y-${index}-${layerIndex}`}>Position Y</Label>
-                                            <Input id={`layer-y-${index}-${layerIndex}`} type="number" placeholder={`${config.height/2 || 360}`} value={layer.y || ''} onChange={(e) => onConfigChange('y', e.target.value, layer.id)} />
+                                            <Input id={`layer-y-${index}-${layerIndex}`} type="number" placeholder={`${config.height/2 || 360}`} value={layer.y ?? ''} onChange={(e) => onConfigChange('y', e.target.value, layer.id)} />
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                             <Label htmlFor={`font-size-${index}-${layerIndex}`}>Font Size</Label>
-                                            <Input id={`font-size-${index}-${layerIndex}`} type="number" value={layer.fontSize} onChange={(e) => onConfigChange('fontSize', e.target.value, layer.id)} />
+                                            <Input id={`font-size-${index}-${layerIndex}`} type="number" value={layer.fontSize ?? ''} onChange={(e) => onConfigChange('fontSize', e.target.value, layer.id)} />
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Alignment</Label>
@@ -404,11 +404,11 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
                     <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                             <Label htmlFor={`width-${index}`}>Width</Label>
-                            <Input id={`width-${index}`} type="number" value={config.width || ''} onChange={(e) => onConfigChange('width', e.target.value)} />
+                            <Input id={`width-${index}`} type="number" value={config.width ?? ''} onChange={(e) => onConfigChange('width', e.target.value)} />
                         </div>
                             <div className="space-y-2">
                             <Label htmlFor={`height-${index}`}>Height</Label>
-                            <Input id={`height-${index}`} type="number" value={config.height || ''} onChange={(e) => onConfigChange('height', e.target.value)} />
+                            <Input id={`height-${index}`} type="number" value={config.height ?? ''} onChange={(e) => onConfigChange('height', e.target.value)} />
                         </div>
                     </div>
 
@@ -749,8 +749,6 @@ export function BatchEditor() {
                     }
                     return l;
                 });
-            } else if (field === 'textLayers') {
-                newConfig.textLayers = value;
             } else {
                 if (["width", "height"].includes(field)) {
                     newConfig[field] = value === '' ? undefined : Number(value);

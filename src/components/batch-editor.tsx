@@ -439,7 +439,7 @@ export function BatchEditor() {
                 title: "JSON Generated",
                 description: "The configuration has been updated with the AI's response.",
             });
-        } catch (error: any)
+        } catch (error: any) {
             console.error("AI JSON Generation Error:", error);
             const description = error.message.includes('JSON.parse')
                 ? "The AI returned invalid JSON. Please try again."
@@ -1049,8 +1049,7 @@ export function BatchEditor() {
                      {jsonError && (
                         <Alert variant="destructive" className="mt-4">
                             <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Invalid JSON</AlertTitle>
-                            <AlertDescription>
+                            <AlertTitle>Invalid JSON</AlertTitle>                            <AlertDescription>
                                 <pre className="text-xs whitespace-pre-wrap">{jsonError}</pre>
                             </AlertDescription>
                         </Alert>

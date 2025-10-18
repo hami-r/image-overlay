@@ -25,8 +25,8 @@ const defaultTextLayer = {
   fontSize: 64,
   fontFamily: fontFamilies[0].family,
   textAlign: 'center' as 'left' | 'center' | 'right',
-  x: 640,
-  y: 360,
+  x: undefined,
+  y: undefined,
   letterSpacing: 0,
   addTextShadow: false,
   textShadowColor: 'rgba(0,0,0,0.5)',
@@ -231,27 +231,30 @@ export function ImageEditor() {
     });
 
     drawBackground.then(() => {
-        textLayers.forEach((layer) => {
+        const autoPositionedLayers = textLayers.filter(l => l.x === undefined || l.y === undefined);
+        const manualPositionedLayers = textLayers.filter(l => l.x !== undefined && l.y !== undefined);
+        
+        let totalAutoHeight = 0;
+        autoPositionedLayers.forEach(layer => {
+            const lines = wrapText(ctx, layer.text);
+            totalAutoHeight += (lines.length * (layer.fontSize * 1.2)) + (layer.fontSize * 0.5); // Add padding between layers
+        });
+        totalAutoHeight -= (autoPositionedLayers[0]?.fontSize || 0) * 0.5; // No padding before first item
+
+        let currentY = (height - totalAutoHeight) / 2;
+
+        const allLayersToDraw = [...autoPositionedLayers, ...manualPositionedLayers];
+
+        allLayersToDraw.forEach((layer) => {
             const {
-                text,
-                textColor,
-                fontSize,
-                fontFamily,
-                textAlign,
-                x,
-                y,
-                letterSpacing,
-                addTextShadow,
-                textShadowColor,
-                textShadowBlur,
-                textShadowOffsetX,
-                textShadowOffsetY,
-                textStrokeWidth,
-                textStrokeColor,
-                addTextBackground,
-                textBackgroundColor
+                text, textColor, fontSize, fontFamily, textAlign, letterSpacing,
+                addTextShadow, textShadowColor, textShadowBlur, textShadowOffsetX, textShadowOffsetY,
+                textStrokeWidth, textStrokeColor, addTextBackground, textBackgroundColor,
             } = layer;
             
+            let x, y;
+            const isAuto = layer.x === undefined || layer.y === undefined;
+
             ctx.font = `${fontSize}px ${fontFamily}`;
             ctx.fillStyle = textColor;
             ctx.textAlign = textAlign as CanvasTextAlign;
@@ -259,45 +262,45 @@ export function ImageEditor() {
             ctx.letterSpacing = `${letterSpacing}px`;
 
             if (addTextShadow) {
-                ctx.shadowColor = textShadowColor;
-                ctx.shadowBlur = textShadowBlur;
-                ctx.shadowOffsetX = textShadowOffsetX;
-                ctx.shadowOffsetY = textShadowOffsetY;
+                ctx.shadowColor = textShadowColor; ctx.shadowBlur = textShadowBlur;
+                ctx.shadowOffsetX = textShadowOffsetX; ctx.shadowOffsetY = textShadowOffsetY;
             } else {
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
+                ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
             }
 
             const lines = wrapText(ctx, text);
             const lineHeight = fontSize * 1.2;
+            const totalLayerHeight = lines.length * lineHeight;
+
+            if (isAuto) {
+                x = width / 2;
+                y = currentY + totalLayerHeight / 2;
+                currentY += totalLayerHeight + (fontSize * 0.5);
+            } else {
+                x = layer.x!;
+                y = layer.y!;
+            }
             
-            const totalTextHeight = lines.length * lineHeight;
-            let startY = y - totalTextHeight / 2;
+            let startY = y - totalLayerHeight / 2;
 
             lines.forEach((line: string, index: number) => {
-                const currentY = startY + index * lineHeight + lineHeight / 2;
+                const currentLineY = startY + index * lineHeight + lineHeight / 2;
                 
                 if (addTextBackground) {
                     const textMetrics = ctx.measureText(line);
                     const textWidth = textMetrics.width;
-
                     const bgPadding = fontSize / 4;
                     const currentShadow = ctx.shadowColor;
                     ctx.shadowColor = 'transparent';
                     ctx.fillStyle = textBackgroundColor;
                     
                     let rectX;
-                     if (textAlign === 'center') {
-                        rectX = x - textWidth / 2 - bgPadding;
-                    } else if (textAlign === 'left') {
-                        rectX = x - bgPadding;
-                    } else { // right
-                        rectX = x - textWidth - bgPadding;
-                    }
+                     if (textAlign === 'left') rectX = x - bgPadding;
+                     else if (textAlign === 'right') rectX = x - textWidth - bgPadding;
+                     else rectX = x - textWidth / 2 - bgPadding;
                     
-                    const rectY = currentY - (lineHeight/2) - bgPadding/2;
+                    const rectY = currentLineY - (lineHeight/2) - bgPadding/2;
                     ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
                     ctx.shadowColor = currentShadow;
                     ctx.fillStyle = textColor;
@@ -306,10 +309,10 @@ export function ImageEditor() {
                 if (textStrokeWidth > 0) {
                     ctx.strokeStyle = textStrokeColor;
                     ctx.lineWidth = textStrokeWidth;
-                    ctx.strokeText(line, x, currentY);
+                    ctx.strokeText(line, x, currentLineY);
                 }
 
-                ctx.fillText(line, x, currentY);
+                ctx.fillText(line, x, currentLineY);
             });
         });
 
@@ -391,11 +394,11 @@ export function ImageEditor() {
                                  <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor={`layer-x-${layer.id}`}>Position X</Label>
-                                        <Input id={`layer-x-${layer.id}`} type="number" value={layer.x} onChange={(e) => handleLayerChange(layer.id, 'x', parseInt(e.target.value) || 0)} />
+                                        <Input id={`layer-x-${layer.id}`} type="number" placeholder={`${previewDim.width/2}`} value={layer.x} onChange={(e) => handleLayerChange(layer.id, 'x', parseInt(e.target.value))} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor={`layer-y-${layer.id}`}>Position Y</Label>
-                                        <Input id={`layer-y-${layer.id}`} type="number" value={layer.y} onChange={(e) => handleLayerChange(layer.id, 'y', parseInt(e.target.value) || 0)} />
+                                        <Input id={`layer-y-${layer.id}`} type="number" placeholder={`${previewDim.height/2}`} value={layer.y} onChange={(e) => handleLayerChange(layer.id, 'y', parseInt(e.target.value))} />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -585,14 +588,15 @@ export function ImageEditor() {
           </CardHeader>
           <CardContent className="flex items-center justify-center bg-card-foreground/5 p-4">
             <div
-              className="w-full flex flex-col items-center justify-center shadow-lg relative"
+              className="w-full flex flex-col items-center justify-center shadow-lg relative overflow-hidden"
               style={{ ...backgroundStyle, aspectRatio: `${previewDim.width} / ${previewDim.height}` }}
             >
               {textLayers.map(layer => {
-                  const xPercent = (layer.x / previewDim.width) * 100;
-                  const yPercent = (layer.y / previewDim.height) * 100;
+                  const xPercent = ((layer.x ?? previewDim.width / 2) / previewDim.width) * 100;
+                  const yPercent = ((layer.y ?? previewDim.height / 2) / previewDim.height) * 100;
 
                   let transform = 'translateY(-50%)';
+                  let left = `${xPercent}%`;
                   if (layer.textAlign === 'center') {
                       transform = 'translateX(-50%) translateY(-50%)';
                   } else if (layer.textAlign === 'right') {
@@ -602,7 +606,7 @@ export function ImageEditor() {
                   const textStyle: React.CSSProperties = {
                     position: 'absolute',
                     top: `${yPercent}%`,
-                    left: `${xPercent}%`,
+                    left: left,
                     transform: transform,
                     color: layer.textColor,
                     fontSize: `${layer.fontSize / 32}rem`, // Scale font size for preview
@@ -611,7 +615,6 @@ export function ImageEditor() {
                     lineHeight: 1.2,
                     whiteSpace: 'pre-wrap',
                     padding: '1rem',
-                    wordBreak: 'break-word',
                     letterSpacing: `${layer.letterSpacing / 32}rem`,
                     WebkitTextStroke: layer.textStrokeWidth > 0 ? `${layer.textStrokeWidth / 16}rem ${layer.textStrokeColor}` : 'unset',
                     textShadow: layer.addTextShadow ? `${layer.textShadowOffsetX/16}rem ${layer.textShadowOffsetY/16}rem ${layer.textShadowBlur/16}rem ${layer.textShadowColor}` : 'none',
@@ -619,10 +622,8 @@ export function ImageEditor() {
                     borderRadius: layer.addTextBackground ? '0.25rem' : 'none',
                   };
                   return (
-                     <div key={layer.id} style={{width: '100%', display: 'flex', justifyContent: 'center'}}>
-                        <p style={textStyle}>
-                            {layer.text}
-                        </p>
+                     <div key={layer.id} style={textStyle}>
+                        {layer.text.split('\n').map((line, i) => <div key={i}>{line || ' '}</div>)}
                      </div>
                   )
               })}

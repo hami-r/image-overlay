@@ -14,10 +14,13 @@ import { Slider } from '@/components/ui/slider';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { fontFamilies } from '@/lib/fonts';
 import { backgroundPatterns } from '@/lib/backgrounds';
-import { AlignLeft, AlignCenter, AlignRight, Upload, Download, Sparkles, Bot, Shuffle, Link, PlusCircle, Trash2 } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, Upload, Download, Sparkles, Bot, Shuffle, Link, PlusCircle, Trash2, LayoutTemplate } from 'lucide-react';
 import { generateBackgroundImage } from '@/ai/flows/generate-background-image';
 import { useToast } from '@/hooks/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
+import { imageTemplates } from '@/lib/templates';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+
 
 const defaultTextLayer = {
   id: Date.now(),
@@ -70,7 +73,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     bgResolve();
                 };
                 img.onerror = () => {
-                    bgReject(new Error(`Failed to load image from ${backgroundImage.substring(0,100)}... Check URL and CORS policy.`));
+                    reject(new Error(`Failed to load image from ${backgroundImage.substring(0,100)}... Check URL and CORS policy.`));
                 };
                 img.src = backgroundImage;
             } else {
@@ -196,7 +199,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
 };
 
 export function ImageEditor() {
-  const [textLayers, setTextLayers] = useState([defaultTextLayer]);
+  const [textLayers, setTextLayers] = useState([{...defaultTextLayer, id: Date.now()}]);
   const [background, setBackground] = useState(backgroundPatterns[0].value);
   const [backgroundImageSrc, setBackgroundImageSrc] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState('');
@@ -207,6 +210,8 @@ export function ImageEditor() {
 
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const [previewDim, setPreviewDim] = useState({ width: 1280, height: 720 });
+  const [templatePopoverOpen, setTemplatePopoverOpen] = useState(false);
+
 
   useEffect(() => {
     const canvas = previewCanvasRef.current;
@@ -232,8 +237,10 @@ export function ImageEditor() {
     setTextLayers(layers => layers.map(layer => {
       if (layer.id === id) {
         const newLayer = { ...layer, [field]: value };
-        if (["fontSize", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY", "x", "y"].includes(field)) {
+        if (["fontSize", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY"].includes(field)) {
           newLayer[field] = value === '' ? undefined : Number(value);
+        } else if (["x", "y"].includes(field)) {
+            newLayer[field] = value === '' ? undefined : Number(value);
         }
         return newLayer;
       }
@@ -385,7 +392,41 @@ export function ImageEditor() {
     setBackground(newBackground);
     setBackgroundImageSrc(null);
     setPreviewDim({width: 1280, height: 720});
-  }
+  };
+
+  const handleLoadTemplate = (templateValue: string) => {
+    if (!templateValue) return;
+
+    try {
+      const parsedTemplates = JSON.parse(templateValue);
+      const imageConfig = parsedTemplates[0]; // Use the first image config from the template array
+
+      if (imageConfig) {
+        setTextLayers(imageConfig.textLayers.map((l: any) => ({ ...l, id: Date.now() + Math.random() })));
+        setPreviewDim({ width: imageConfig.width || 1280, height: imageConfig.height || 720 });
+        
+        if (imageConfig.backgroundImage) {
+          setBackgroundImageSrc(imageConfig.backgroundImage);
+          setBackground('');
+        } else {
+          setBackgroundImageSrc(null);
+          setBackground(imageConfig.background || '#FFFFFF');
+        }
+
+        toast({
+          title: "Template Loaded",
+          description: "The editor has been updated with the selected template."
+        });
+        setTemplatePopoverOpen(false);
+      }
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Failed to load template",
+        description: "The selected template contained invalid data."
+      });
+    }
+  };
   
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -395,7 +436,29 @@ export function ImageEditor() {
           <CardDescription>Adjust the settings to create your perfect image overlay.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          
+          <Popover open={templatePopoverOpen} onOpenChange={setTemplatePopoverOpen}>
+              <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start">
+                      <LayoutTemplate className="mr-2 h-4 w-4" />
+                      Load a Template...
+                  </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-1">
+                  <div className="flex flex-col">
+                      {imageTemplates.map(template => (
+                          <Button 
+                              key={template.name} 
+                              variant="ghost" 
+                              className="justify-start"
+                              onClick={() => handleLoadTemplate(template.json)}
+                          >
+                              {template.name}
+                          </Button>
+                      ))}
+                  </div>
+              </PopoverContent>
+          </Popover>
+
           <Accordion type="multiple" defaultValue={[`layer-${textLayers[0]?.id}`]} className="w-full">
             <AccordionItem value="text-layers">
                 <AccordionTrigger>Text Layers</AccordionTrigger>
@@ -441,8 +504,8 @@ export function ImageEditor() {
                                     <Slider value={[layer.fontSize]} onValueChange={([val]) => handleLayerChange(layer.id, 'fontSize', val)} min={16} max={256} step={1} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Letter Spacing: {layer.letterSpacing}px</Label>
-                                    <Slider value={[layer.letterSpacing]} onValueChange={([val]) => handleLayerChange(layer.id, 'letterSpacing', val)} min={-10} max={50} step={1} />
+                                    <Label>Letter Spacing: {layer.letterSpacing || 0}px</Label>
+                                    <Slider value={[layer.letterSpacing || 0]} onValueChange={([val]) => handleLayerChange(layer.id, 'letterSpacing', val)} min={-10} max={50} step={1} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Text Alignment</Label>
@@ -475,7 +538,7 @@ export function ImageEditor() {
                                                     <Label>Text Stroke</Label>
                                                     <p className="text-xs text-muted-foreground">Add an outline to text.</p>
                                                 </div>
-                                                <Switch checked={layer.textStrokeWidth > 0} onCheckedChange={(checked) => handleLayerChange(layer.id, 'textStrokeWidth', checked ? 2 : 0)} />
+                                                <Switch checked={!!layer.textStrokeWidth && layer.textStrokeWidth > 0} onCheckedChange={(checked) => handleLayerChange(layer.id, 'textStrokeWidth', checked ? 2 : 0)} />
                                             </div>
                                             {layer.textStrokeWidth > 0 && (
                                                 <div className="space-y-4 border p-3 rounded-lg">
@@ -503,17 +566,17 @@ export function ImageEditor() {
                                                         <Input id={`text-shadow-color-${layer.id}`} type="color" value={layer.textShadowColor} onChange={(e) => handleLayerChange(layer.id, 'textShadowColor', e.target.value)} className="p-1 h-10"/>
                                                     </div>
                                                     <div className="space-y-2">
-                                                        <Label>Shadow Blur: {layer.textShadowBlur}px</Label>
-                                                        <Slider value={[layer.textShadowBlur]} onValueChange={([val]) => handleLayerChange(layer.id, 'textShadowBlur', val)} min={0} max={50} step={1} />
+                                                        <Label>Shadow Blur: {layer.textShadowBlur || 10}px</Label>
+                                                        <Slider value={[layer.textShadowBlur || 10]} onValueChange={([val]) => handleLayerChange(layer.id, 'textShadowBlur', val)} min={0} max={50} step={1} />
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-4">
                                                         <div className="space-y-2">
-                                                            <Label>Offset X: {layer.textShadowOffsetX}px</Label>
-                                                            <Slider value={[layer.textShadowOffsetX]} onValueChange={([val]) => handleLayerChange(layer.id, 'textShadowOffsetX', val)} min={-20} max={20} step={1} />
+                                                            <Label>Offset X: {layer.textShadowOffsetX || 5}px</Label>
+                                                            <Slider value={[layer.textShadowOffsetX || 5]} onValueChange={([val]) => handleLayerChange(layer.id, 'textShadowOffsetX', val)} min={-20} max={20} step={1} />
                                                         </div>
                                                         <div className="space-y-2">
-                                                            <Label>Offset Y: {layer.textShadowOffsetY}px</Label>
-                                                            <Slider value={[layer.textShadowOffsetY]} onValueChange={([val]) => handleLayerChange(layer.id, 'textShadowOffsetY', val)} min={-20} max={20} step={1} />
+                                                            <Label>Offset Y: {layer.textShadowOffsetY || 5}px</Label>
+                                                            <Slider value={[layer.textShadowOffsetY || 5]} onValueChange={([val]) => handleLayerChange(layer.id, 'textShadowOffsetY', val)} min={-20} max={20} step={1} />
                                                         </div>
                                                     </div>
                                                 </div>
@@ -642,7 +705,3 @@ export function ImageEditor() {
     </div>
   );
 }
-
-    
-
-    

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +39,162 @@ const defaultTextLayer = {
   textBackgroundColor: 'rgba(0, 0, 0, 0.5)',
 };
 
+const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
+    return new Promise<void>((resolve, reject) => {
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error("Could not get canvas context."));
+
+        const dpr = config.dpr || 1;
+        
+        const {
+            textLayers = [],
+            background = "#FFFFFF",
+            backgroundImage,
+            width = 1280,
+            height = 720,
+        } = config;
+
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.scale(dpr, dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+
+        const drawBackground = new Promise<void>((bgResolve) => {
+            if (backgroundImage) {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0, width, height);
+                    bgResolve();
+                };
+                img.onerror = (e) => {
+                    console.error("Error loading image for canvas:", e);
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, width, height);
+                    bgResolve();
+                };
+                img.src = backgroundImage;
+            } else {
+                ctx.fillStyle = background;
+                if (background && background.includes('gradient')) {
+                    const colors = background.match(/#(?:[0-9a-fA-F]{3}){1,2}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)|hsl\(\s*\d+\s*,\s*[\d.]+\%\s*,\s*[\d.]+\%\s*\)/g);
+                    if (colors && colors.length >= 2) {
+                        const directionMatch = background.match(/to (right|left|bottom|top|bottom right|bottom left|top left|top right)/);
+                        const direction = directionMatch ? directionMatch[1] : 'right';
+                        let gradient;
+
+                        if (direction === 'right') gradient = ctx.createLinearGradient(0, 0, width, 0);
+                        else if (direction === 'left') gradient = ctx.createLinearGradient(width, 0, 0, 0);
+                        else if (direction === 'bottom') gradient = ctx.createLinearGradient(0, 0, 0, height);
+                        else if (direction === 'bottom right') gradient = ctx.createLinearGradient(0, 0, width, height);
+                        else if (direction === 'bottom left') gradient = ctx.createLinearGradient(width, 0, 0, height);
+                        else if (direction === 'top left') gradient = ctx.createLinearGradient(width, height, 0, 0);
+                        else if (direction === 'top right') gradient = ctx.createLinearGradient(0, height, width, 0);
+                        else gradient = ctx.createLinearGradient(0, height, 0, 0);
+
+                        gradient.addColorStop(0, colors[0]);
+                        gradient.addColorStop(1, colors[1]);
+                        ctx.fillStyle = gradient;
+                    }
+                }
+                ctx.fillRect(0, 0, width, height);
+                bgResolve();
+            }
+        });
+
+        drawBackground.then(() => {
+            const autoPositionedLayers = textLayers.filter((l: any) => l.x === undefined || l.y === undefined);
+            const manualPositionedLayers = textLayers.filter((l: any) => l.x !== undefined && l.y !== undefined);
+
+            let totalAutoHeight = 0;
+            autoPositionedLayers.forEach((layer: any) => {
+                const lines = (layer.text || '').split('\n');
+                totalAutoHeight += (lines.length * (layer.fontSize * 1.2)) + (layer.fontSize * 0.5); // Padding
+            });
+            totalAutoHeight -= (autoPositionedLayers[0]?.fontSize || 0) * 0.5; // No padding before first item
+
+            let currentY = (height - totalAutoHeight) / 2;
+
+            const allLayersToDraw = [...autoPositionedLayers, ...manualPositionedLayers];
+
+            allLayersToDraw.forEach((layer: any) => {
+                const {
+                    text = "", textColor = '#000000', fontSize = 64, fontFamily = "'Inter', sans-serif",
+                    textAlign = 'center', letterSpacing = 0, addTextShadow = false,
+                    textShadowColor = 'rgba(0,0,0,0.5)', textShadowBlur = 10,
+                    textShadowOffsetX = 5, textShadowOffsetY = 5, textStrokeWidth = 0,
+                    textStrokeColor = '#000000', addTextBackground = false, textBackgroundColor = 'rgba(0,0,0,0.5)',
+                } = layer;
+
+                let x, y;
+                const isAuto = layer.x === undefined || layer.y === undefined;
+                
+                ctx.font = `${fontSize}px ${fontFamily}`;
+                ctx.fillStyle = textColor;
+                ctx.textAlign = textAlign as CanvasTextAlign;
+                ctx.letterSpacing = `${letterSpacing}px`;
+                ctx.textBaseline = 'middle';
+
+                if (addTextShadow) {
+                    ctx.shadowColor = textShadowColor; ctx.shadowBlur = textShadowBlur;
+                    ctx.shadowOffsetX = textShadowOffsetX; ctx.shadowOffsetY = textShadowOffsetY;
+                } else {
+                    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+                    ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+                }
+
+                const lines = text.split('\n');
+                const lineHeight = fontSize * 1.2;
+                const totalLayerHeight = lines.length * lineHeight;
+                
+                if (isAuto) {
+                    x = width / 2;
+                    y = currentY + totalLayerHeight / 2;
+                    currentY += totalLayerHeight + (fontSize * 0.5);
+                } else {
+                    x = layer.x!;
+                    y = layer.y!;
+                }
+
+                let startY = y - totalLayerHeight / 2;
+                
+                lines.forEach((line: string, lineIndex: number) => {
+                    const currentLineY = startY + lineIndex * lineHeight + lineHeight / 2;
+                    
+                    if (addTextBackground) {
+                        const textMetrics = ctx.measureText(line);
+                        const textWidth = textMetrics.width;
+                        const bgPadding = fontSize / 4;
+                        const currentShadow = ctx.shadowColor;
+                        ctx.shadowColor = 'transparent';
+                        ctx.fillStyle = textBackgroundColor;
+
+                        let rectX;
+                        if (textAlign === 'left') rectX = x - bgPadding;
+                        else if (textAlign === 'right') rectX = x - textWidth - bgPadding;
+                        else rectX = x - textWidth / 2 - bgPadding;
+                        
+                        const rectY = currentLineY - (lineHeight/2) - bgPadding/2;
+                        ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
+                        
+                        ctx.shadowColor = currentShadow;
+                        ctx.fillStyle = textColor;
+                    }
+
+                    if (textStrokeWidth > 0) {
+                        ctx.strokeStyle = textStrokeColor;
+                        ctx.lineWidth = textStrokeWidth;
+                        ctx.strokeText(line, x, currentLineY);
+                    }
+                    ctx.fillText(line, x, currentLineY);
+                });
+            });
+            resolve();
+        });
+    });
+};
+
 export function ImageEditor() {
   const [textLayers, setTextLayers] = useState([defaultTextLayer]);
   const [background, setBackground] = useState(backgroundPatterns[0].value);
@@ -49,8 +205,22 @@ export function ImageEditor() {
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const [previewDim, setPreviewDim] = useState({ width: 1280, height: 720 });
+
+  useEffect(() => {
+    const canvas = previewCanvasRef.current;
+    if (canvas) {
+      drawOnCanvas(canvas, {
+        textLayers,
+        background,
+        backgroundImage: backgroundImageSrc,
+        width: previewDim.width,
+        height: previewDim.height,
+        dpr: 1, // Use lower DPR for preview for performance
+      });
+    }
+  }, [textLayers, background, backgroundImageSrc, previewDim]);
 
   const handleLayerChange = (id: number, field: string, value: any) => {
     setTextLayers(layers => layers.map(layer => {
@@ -166,168 +336,31 @@ export function ImageEditor() {
         setIsGenerating(false);
     }
   };
-  
-    const wrapText = (ctx: CanvasRenderingContext2D, text: string): string[] => {
-        if (!text) return [];
-        return text.split('\n');
-    };
 
-  const handleDownload = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  const handleDownload = async () => {
+    const canvas = document.createElement('canvas');
     
-    const dpr = window.devicePixelRatio || 1;
-    const { width, height } = previewDim;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx.scale(dpr, dpr);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-
-    const drawBackground = new Promise<void>((resolve) => {
-      if (backgroundImageSrc) {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-          ctx.drawImage(img, 0, 0, width, height);
-          resolve();
-        };
-        img.onerror = (e) => {
-            console.error("Error loading image for canvas:", e);
-            toast({
-                variant: 'destructive',
-                title: 'Background Image Error',
-                description: 'Could not load the background image. It might be due to CORS policy. Using a fallback background.',
-            });
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, width, height);
-            resolve();
-        };
-        img.src = backgroundImageSrc;
-      } else {
-        ctx.fillStyle = background.includes('gradient') ? '#F0F0F0' : background;
-        if(background.includes('gradient')) {
-            const colors = background.match(/#(?:[0-9a-fA-F]{3}){1,2}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)|hsl\(\s*\d+\s*,\s*[\d.]+\%\s*,\s*[\d.]+\%\s*\)/g);
-            if (colors && colors.length >= 2) {
-                const directionMatch = background.match(/to (right|left|bottom|top|bottom right|bottom left|top left|top right)/);
-                const direction = directionMatch ? directionMatch[1] : 'right';
-                let gradient;
-
-                if (direction === 'right') gradient = ctx.createLinearGradient(0, 0, width, 0);
-                else if (direction === 'left') gradient = ctx.createLinearGradient(width, 0, 0, 0);
-                else if (direction === 'bottom') gradient = ctx.createLinearGradient(0, 0, 0, height);
-                else if (direction === 'bottom right') gradient = ctx.createLinearGradient(0, 0, width, height);
-                else if (direction === 'bottom left') gradient = ctx.createLinearGradient(width, 0, 0, height);
-                else if (direction === 'top left') gradient = ctx.createLinearGradient(width, height, 0, 0);
-                else if (direction === 'top right') gradient = ctx.createLinearGradient(0, height, width, 0);
-                else gradient = ctx.createLinearGradient(0, height, 0, 0);
-
-                gradient.addColorStop(0, colors[0]);
-                gradient.addColorStop(1, colors[1]);
-                ctx.fillStyle = gradient;
-            } else {
-                ctx.fillStyle = '#FFFFFF';
-            }
-        }
-        ctx.fillRect(0, 0, width, height);
-        resolve();
-      }
-    });
-
-    drawBackground.then(() => {
-        const autoPositionedLayers = textLayers.filter(l => l.x === undefined || l.y === undefined);
-        const manualPositionedLayers = textLayers.filter(l => l.x !== undefined && l.y !== undefined);
-        
-        let totalAutoHeight = 0;
-        autoPositionedLayers.forEach(layer => {
-            const lines = wrapText(ctx, layer.text);
-            totalAutoHeight += (lines.length * (layer.fontSize * 1.2)) + (layer.fontSize * 0.5); // Add padding between layers
-        });
-        totalAutoHeight -= (autoPositionedLayers[0]?.fontSize || 0) * 0.5; // No padding before first item
-
-        let currentY = (height - totalAutoHeight) / 2;
-
-        const allLayersToDraw = [...autoPositionedLayers, ...manualPositionedLayers];
-
-        allLayersToDraw.forEach((layer) => {
-            const {
-                text, textColor, fontSize, fontFamily, textAlign, letterSpacing,
-                addTextShadow, textShadowColor, textShadowBlur, textShadowOffsetX, textShadowOffsetY,
-                textStrokeWidth, textStrokeColor, addTextBackground, textBackgroundColor,
-            } = layer;
-            
-            let x, y;
-            const isAuto = layer.x === undefined || layer.y === undefined;
-
-            ctx.font = `${fontSize}px ${fontFamily}`;
-            ctx.fillStyle = textColor;
-            ctx.textAlign = textAlign as CanvasTextAlign;
-            ctx.textBaseline = 'middle';
-            ctx.letterSpacing = `${letterSpacing}px`;
-
-            if (addTextShadow) {
-                ctx.shadowColor = textShadowColor; ctx.shadowBlur = textShadowBlur;
-                ctx.shadowOffsetX = textShadowOffsetX; ctx.shadowOffsetY = textShadowOffsetY;
-            } else {
-                ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
-                ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-            }
-
-            const lines = wrapText(ctx, text);
-            const lineHeight = fontSize * 1.2;
-            const totalLayerHeight = lines.length * lineHeight;
-
-            if (isAuto) {
-                x = width / 2;
-                y = currentY + totalLayerHeight / 2;
-                currentY += totalLayerHeight + (fontSize * 0.5);
-            } else {
-                x = layer.x!;
-                y = layer.y!;
-            }
-            
-            let startY = y - totalLayerHeight / 2;
-
-            lines.forEach((line: string, index: number) => {
-                const currentLineY = startY + index * lineHeight + lineHeight / 2;
-                
-                if (addTextBackground) {
-                    const textMetrics = ctx.measureText(line);
-                    const textWidth = textMetrics.width;
-                    const bgPadding = fontSize / 4;
-                    const currentShadow = ctx.shadowColor;
-                    ctx.shadowColor = 'transparent';
-                    ctx.fillStyle = textBackgroundColor;
-                    
-                    let rectX;
-                     if (textAlign === 'left') rectX = x - bgPadding;
-                     else if (textAlign === 'right') rectX = x - textWidth - bgPadding;
-                     else rectX = x - textWidth / 2 - bgPadding;
-                    
-                    const rectY = currentLineY - (lineHeight/2) - bgPadding/2;
-                    ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
-                    ctx.shadowColor = currentShadow;
-                    ctx.fillStyle = textColor;
-                }
-                
-                if (textStrokeWidth > 0) {
-                    ctx.strokeStyle = textStrokeColor;
-                    ctx.lineWidth = textStrokeWidth;
-                    ctx.strokeText(line, x, currentLineY);
-                }
-
-                ctx.fillText(line, x, currentLineY);
-            });
+    try {
+        await drawOnCanvas(canvas, {
+            textLayers,
+            background,
+            backgroundImage: backgroundImageSrc,
+            width: previewDim.width,
+            height: previewDim.height,
+            dpr: window.devicePixelRatio || 2,
         });
 
         const link = document.createElement('a');
         link.download = 'image-overlay.png';
         link.href = canvas.toDataURL('image/png');
         link.click();
-    });
+    } catch(e: any) {
+        toast({
+            variant: "destructive",
+            title: "Failed to generate image",
+            description: e.message
+        })
+    }
   };
 
   const handleRandomBackground = () => {
@@ -347,30 +380,6 @@ export function ImageEditor() {
     setBackgroundImageSrc(null);
     setPreviewDim({width: 1280, height: 720});
   }
-  
-  const backgroundStyle: React.CSSProperties = backgroundImageSrc ? {
-    backgroundImage: `url(${backgroundImageSrc})`,
-    backgroundSize: 'contain',
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'center',
-    backgroundColor: 'var(--card)'
-  } : {
-    background: background,
-  };
-
-    // Auto-layout logic for preview
-    const autoPositionedLayers = textLayers.filter((l: any) => l.x === undefined || l.y === undefined);
-    const manualPositionedLayers = textLayers.filter((l: any) => l.x !== undefined && l.y !== undefined);
-
-    let totalAutoHeight = 0;
-    autoPositionedLayers.forEach((layer: any) => {
-        const lines = (layer.text || '').split('\n');
-        const fontSizeRem = (layer.fontSize || 64) / 32;
-        totalAutoHeight += (lines.length * (fontSizeRem * 1.2)) + (fontSizeRem * 0.5); // Padding
-    });
-    totalAutoHeight -= ((autoPositionedLayers[0]?.fontSize || 0) / 32) * 0.5;
-
-    let currentYPercent = (50 - (totalAutoHeight / 2));
   
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -607,67 +616,13 @@ export function ImageEditor() {
             <CardTitle>Preview</CardTitle>
           </CardHeader>
           <CardContent className="flex items-center justify-center bg-card-foreground/5 p-4">
-            <div
-              className="w-full flex flex-col items-center justify-center shadow-lg relative overflow-hidden"
-              style={{ ...backgroundStyle, aspectRatio: `${previewDim.width} / ${previewDim.height}` }}
-            >
-              {manualPositionedLayers.map((layer:any, i:number) => {
-                  const xPercent = ((layer.x ?? previewDim.width / 2) / previewDim.width) * 100;
-                  const yPercent = ((layer.y ?? previewDim.height / 2) / previewDim.height) * 100;
-                  const fontSizeRem = layer.fontSize / 32;
-
-                  let transform = 'translateY(-50%)';
-                  let left = `${xPercent}%`;
-                  if (layer.textAlign === 'center') {
-                      transform = 'translateX(-50%) translateY(-50%)';
-                  } else if (layer.textAlign === 'right') {
-                      transform = 'translateX(-100%) translateY(-50%)';
-                  }
-                  
-                  const textStyle: React.CSSProperties = {
-                    position: 'absolute', top: `${yPercent}%`, left: left, transform: transform,
-                    color: layer.textColor, fontSize: `${fontSizeRem}rem`, fontFamily: layer.fontFamily,
-                    textAlign: layer.textAlign as CanvasTextAlign, lineHeight: 1.2, whiteSpace: 'pre-wrap',
-                    letterSpacing: `${layer.letterSpacing / 32}rem`,
-                    WebkitTextStroke: layer.textStrokeWidth > 0 ? `${layer.textStrokeWidth / 16}rem ${layer.textStrokeColor}` : 'unset',
-                    textShadow: layer.addTextShadow ? `${layer.textShadowOffsetX/16}rem ${layer.textShadowOffsetY/16}rem ${layer.textShadowBlur/16}rem ${layer.textShadowColor}` : 'none',
-                    backgroundColor: layer.addTextBackground ? layer.textBackgroundColor : 'transparent',
-                    padding: layer.addTextBackground ? `${fontSizeRem / 4}rem` : '0',
-                    borderRadius: layer.addTextBackground ? '0.25rem' : 'none',
-                  };
-                  return (
-                     <div key={`manual-${layer.id}`} style={textStyle}>
-                        {layer.text.split('\n').map((line:string, j:number) => <div key={j}>{line || ' '}</div>)}
-                     </div>
-                  )
-              })}
-              {autoPositionedLayers.map((layer: any) => {
-                  const fontSizeRem = layer.fontSize / 32;
-                  const lines = layer.text.split('\n');
-                  const totalLayerHeightRem = lines.length * fontSizeRem * 1.2;
-                  const yPercent = currentYPercent + totalLayerHeightRem / 2;
-                  currentYPercent += totalLayerHeightRem + (fontSizeRem * 0.5);
-
-                  const textStyle: React.CSSProperties = {
-                      position: 'absolute', top: `${yPercent}%`, left: '50%', transform: 'translateX(-50%) translateY(-50%)',
-                      color: layer.textColor, fontSize: `${fontSizeRem}rem`, fontFamily: layer.fontFamily,
-                      textAlign: layer.textAlign as CanvasTextAlign, lineHeight: 1.2, whiteSpace: 'pre-wrap',
-                      letterSpacing: `${layer.letterSpacing / 32}rem`,
-                      WebkitTextStroke: layer.textStrokeWidth > 0 ? `${layer.textStrokeWidth / 16}rem ${layer.textStrokeColor}` : 'unset',
-                      textShadow: layer.addTextShadow ? `${layer.textShadowOffsetX/16}rem ${layer.textShadowOffsetY/16}rem ${layer.textShadowBlur/16}rem ${layer.textShadowColor}` : 'none',
-                      backgroundColor: layer.addTextBackground ? layer.textBackgroundColor : 'transparent',
-                      padding: layer.addTextBackground ? `${fontSizeRem / 4}rem` : '0',
-                      borderRadius: layer.addTextBackground ? '0.25rem' : 'none',
-                      width: '90%',
-                  };
-
-                  return (
-                      <div key={`auto-${layer.id}`} style={textStyle}>
-                          {lines.map((line: string, i: number) => <div key={i}>{line || ' '}</div>)}
-                      </div>
-                  )
-              })}
-            </div>
+            <canvas 
+                ref={previewCanvasRef} 
+                className="shadow-lg rounded-md max-w-full"
+                style={{
+                    aspectRatio: `${previewDim.width} / ${previewDim.height}`
+                }}
+            />
           </CardContent>
           <CardFooter>
             <Button onClick={handleDownload} className="w-full" size="lg">
@@ -678,7 +633,8 @@ export function ImageEditor() {
         </Card>
       </div>
 
-      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }
+
+    

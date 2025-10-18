@@ -493,6 +493,7 @@ export function BatchEditor() {
     // State for "Apply styles from item"
     const [applyStylesDialogOpen, setApplyStylesDialogOpen] = useState(false);
     const [styleSourceIndex, setStyleSourceIndex] = useState<number | null>(null);
+    const [templatePopoverOpen, setTemplatePopoverOpen] = useState(false);
 
     const { toast } = useToast();
 
@@ -897,6 +898,7 @@ export function BatchEditor() {
             title: "Template Loaded",
             description: "The editor has been updated with the selected template."
         });
+        setTemplatePopoverOpen(false);
     };
 
     const BatchPreview = ({ config, index }: { config: any; index: number }) => {
@@ -1037,7 +1039,7 @@ export function BatchEditor() {
                 </div>
                  <div className="space-y-2">
                     <Label>Load a Template</Label>
-                    <Popover>
+                    <Popover open={templatePopoverOpen} onOpenChange={setTemplatePopoverOpen}>
                         <PopoverTrigger asChild>
                             <Button variant="outline" className="w-full justify-start">
                                 <LayoutTemplate className="mr-2 h-4 w-4" />
@@ -1135,6 +1137,8 @@ export function BatchEditor() {
         </div>
     );
 }
+
+    
 
     
 

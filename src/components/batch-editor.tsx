@@ -264,11 +264,11 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label htmlFor={`layer-x-${index}-${layerIndex}`}>Position X</Label>
-                                            <Input id={`layer-x-${index}-${layerIndex}`} type="number" placeholder={`${config.width/2 || 640}`} value={layer.x} onChange={(e) => onConfigChange('x', e.target.value, layer.id)} />
+                                            <Input id={`layer-x-${index}-${layerIndex}`} type="number" placeholder={`${config.width/2 || 640}`} value={layer.x || ''} onChange={(e) => onConfigChange('x', e.target.value, layer.id)} />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor={`layer-y-${index}-${layerIndex}`}>Position Y</Label>
-                                            <Input id={`layer-y-${index}-${layerIndex}`} type="number" placeholder={`${config.height/2 || 360}`} value={layer.y} onChange={(e) => onConfigChange('y', e.target.value, layer.id)} />
+                                            <Input id={`layer-y-${index}-${layerIndex}`} type="number" placeholder={`${config.height/2 || 360}`} value={layer.y || ''} onChange={(e) => onConfigChange('y', e.target.value, layer.id)} />
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
@@ -404,11 +404,11 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
                     <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                             <Label htmlFor={`width-${index}`}>Width</Label>
-                            <Input id={`width-${index}`} type="number" value={config.width} onChange={(e) => onConfigChange('width', e.target.value)} />
+                            <Input id={`width-${index}`} type="number" value={config.width || ''} onChange={(e) => onConfigChange('width', e.target.value)} />
                         </div>
                             <div className="space-y-2">
                             <Label htmlFor={`height-${index}`}>Height</Label>
-                            <Input id={`height-${index}`} type="number" value={config.height} onChange={(e) => onConfigChange('height', e.target.value)} />
+                            <Input id={`height-${index}`} type="number" value={config.height || ''} onChange={(e) => onConfigChange('height', e.target.value)} />
                         </div>
                     </div>
 
@@ -468,7 +468,11 @@ export function BatchEditor() {
     useEffect(() => {
         // Sync configs back to JSON input if there's no error
         if (!jsonError) {
-             const newJson = JSON.stringify(configs, (key, value) => key === 'id' ? undefined : value, 2);
+             const newJson = JSON.stringify(configs, (key, value) => {
+                if (key === 'id') return undefined;
+                if (value === undefined) return undefined; // Omit undefined values
+                return value;
+             }, 2);
              if (newJson !== jsonInput) {
                  // To prevent infinite loops, only update if the stringified version is different
                  // and the parsed versions are also different (deep check is too slow)
@@ -728,39 +732,40 @@ export function BatchEditor() {
     };
 
     const handleConfigChange = (index: number, field: string, value: any, layerId?: number) => {
-        const newConfigs = [...configs];
-        let newConfig = { ...newConfigs[index] };
-        
-        if (field === 'textLayers' || layerId !== undefined) {
-             let targetLayerId = layerId;
-
-             if (targetLayerId !== undefined) {
-                 newConfig.textLayers = newConfig.textLayers.map((l:any) => 
-                     l.id === targetLayerId ? { ...l, [field]: value } : l
-                 );
-            } else {
+        setConfigs(prevConfigs => {
+            const newConfigs = [...prevConfigs];
+            let newConfig = { ...newConfigs[index] };
+    
+            if (layerId !== undefined) {
+                newConfig.textLayers = newConfig.textLayers.map((l: any) => {
+                    if (l.id === layerId) {
+                        const newLayer = { ...l };
+                        if (["fontSize", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY", "x", "y"].includes(field)) {
+                            newLayer[field] = value === '' ? undefined : Number(value);
+                        } else {
+                            newLayer[field] = value;
+                        }
+                        return newLayer;
+                    }
+                    return l;
+                });
+            } else if (field === 'textLayers') {
                 newConfig.textLayers = value;
+            } else {
+                if (["width", "height"].includes(field)) {
+                    newConfig[field] = value === '' ? undefined : Number(value);
+                } else {
+                    newConfig[field] = value;
+                }
             }
-        } else {
-            newConfig[field] = value;
-        }
-        
-        if (["fontSize", "width", "height", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY", "x", "y"].includes(field)) {
-             if (layerId !== undefined) {
-                  newConfig.textLayers = newConfig.textLayers.map((l:any) => 
-                     l.id === layerId ? { ...l, [field]: value === '' ? undefined : Number(value) } : l
-                 );
-             } else {
-                 newConfig[field] = Number(value);
-             }
-        }
-
-        if (field === "background") {
-            delete newConfig.backgroundImage;
-        }
-
-        newConfigs[index] = newConfig;
-        setConfigs(newConfigs);
+    
+            if (field === "background") {
+                delete newConfig.backgroundImage;
+            }
+    
+            newConfigs[index] = newConfig;
+            return newConfigs;
+        });
     };
 
     const handleImageUpload = (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
@@ -941,7 +946,7 @@ export function BatchEditor() {
             delete sourceStyles.backgroundImage;
         }
         
-        const sourceLayerStyles = textLayers[0] ? (({ text, ...rest }) => rest)(textLayers[0]) : {};
+        const sourceLayerStyles = textLayers[0] ? (({ text, ...rest }: {text: string, [key: string]: any}) => rest)(textLayers[0]) : {};
 
         const newConfigs = configs.map((config, index) => {
             if (index === styleSourceIndex) {
@@ -981,6 +986,21 @@ export function BatchEditor() {
             background: background,
           };
 
+        // Auto-layout logic for preview
+        const autoPositionedLayers = textLayers.filter((l: any) => l.x === undefined || l.y === undefined);
+        const manualPositionedLayers = textLayers.filter((l: any) => l.x !== undefined && l.y !== undefined);
+
+        let totalAutoHeight = 0;
+        autoPositionedLayers.forEach((layer: any) => {
+            const lines = (layer.text || '').split('\n');
+            const fontSizeRem = (layer.fontSize || 64) / 32;
+            totalAutoHeight += (lines.length * (fontSizeRem * 1.2)) + (fontSizeRem * 0.5); // Padding
+        });
+        totalAutoHeight -= ((autoPositionedLayers[0]?.fontSize || 0) / 32) * 0.5;
+
+        let currentYPercent = (50 - (totalAutoHeight / 2));
+
+
         return (
             <div key={index} className="flex flex-col gap-2">
                 <p className="text-sm font-medium text-muted-foreground">Preview {index + 1}</p>
@@ -988,59 +1008,71 @@ export function BatchEditor() {
                     className="w-full flex flex-col items-center justify-center shadow-lg rounded-md bg-card-foreground/5 relative overflow-hidden"
                     style={{ ...backgroundStyle, aspectRatio: `${width} / ${height}` }}
                 >
-                    {textLayers.map((layer:any, i:number) => {
+                    {manualPositionedLayers.map((layer:any, i:number) => {
                         const {
-                            text = "Missing Text",
-                            textColor = "#000000",
-                            fontSize = 64,
-                            fontFamily = "'Inter', sans-serif",
-                            textAlign = "center",
-                            letterSpacing = 0,
-                            addTextShadow = false,
-                            textShadowColor = 'rgba(0,0,0,0.5)',
-                            textShadowBlur = 10,
-                            textShadowOffsetX = 5,
-                            textShadowOffsetY = 5,
-                            textStrokeWidth = 0,
-                            textStrokeColor = '#000000',
-                            addTextBackground = false,
-                            textBackgroundColor = 'rgba(0,0,0,0.5)',
-                            x,
-                            y,
+                            text = "Missing Text", textColor = "#000000", fontSize = 64, fontFamily = "'Inter', sans-serif",
+                            textAlign = "center", letterSpacing = 0, addTextShadow = false, textShadowColor = 'rgba(0,0,0,0.5)',
+                            textShadowBlur = 10, textShadowOffsetX = 5, textShadowOffsetY = 5, textStrokeWidth = 0,
+                            textStrokeColor = '#000000', addTextBackground = false, textBackgroundColor = 'rgba(0,0,0,0.5)',
+                            x, y,
                         } = layer;
                         
-                        const xPercent = ((x ?? width / 2) / width) * 100;
-                        const yPercent = ((y ?? height / 2) / height) * 100;
+                        const xPercent = (x / width) * 100;
+                        const yPercent = (y / height) * 100;
+                        const fontSizeRem = fontSize / 32;
 
                         let transform = 'translateY(-50%)';
                         let left = `${xPercent}%`;
-                        if (textAlign === 'center') {
-                            transform = 'translateX(-50%) translateY(-50%)';
-                        } else if (textAlign === 'right') {
-                            transform = 'translateX(-100%) translateY(-50%)';
-                        }
+                        if (textAlign === 'center') transform = 'translateX(-50%) translateY(-50%)';
+                        else if (textAlign === 'right') transform = 'translateX(-100%) translateY(-50%)';
                         
                         const textStyle: React.CSSProperties = {
-                            position: 'absolute',
-                            top: `${yPercent}%`,
-                            left: left,
-                            transform: transform,
-                            color: textColor,
-                            fontSize: `${fontSize / 32}rem`,
-                            fontFamily: fontFamily,
-                            textAlign: textAlign as CanvasTextAlign,
-                            lineHeight: 1.2,
-                            whiteSpace: 'pre-wrap',
-                            padding: '1rem',
-                            letterSpacing: `${letterSpacing / 32}rem`,
+                            position: 'absolute', top: `${yPercent}%`, left: left, transform: transform, color: textColor,
+                            fontSize: `${fontSizeRem}rem`, fontFamily: fontFamily, textAlign: textAlign as CanvasTextAlign,
+                            lineHeight: 1.2, whiteSpace: 'pre-wrap', letterSpacing: `${letterSpacing / 32}rem`,
                             WebkitTextStroke: textStrokeWidth > 0 ? `${textStrokeWidth / 16}rem ${textStrokeColor}` : 'unset',
                             textShadow: addTextShadow ? `${textShadowOffsetX/16}rem ${textShadowOffsetY/16}rem ${textShadowBlur/16}rem ${textShadowColor}` : 'none',
                             backgroundColor: addTextBackground ? textBackgroundColor : 'transparent',
+                            padding: addTextBackground ? `${fontSizeRem / 4}rem` : '0',
+                            borderRadius: addTextBackground ? '0.25rem' : 'none',
                         };
 
                         return (
-                             <div key={i} style={textStyle}>
-                                {text.split('\n').map((line:string, i:number) => <div key={i}>{line || ' '}</div>)}
+                             <div key={`manual-${i}`} style={textStyle}>
+                                {text.split('\n').map((line:string, j:number) => <div key={j}>{line || ' '}</div>)}
+                            </div>
+                        )
+                    })}
+                    {autoPositionedLayers.map((layer: any, i: number) => {
+                        const {
+                            text = "Missing Text", textColor = "#000000", fontSize = 64, fontFamily = "'Inter', sans-serif",
+                            textAlign = "center", letterSpacing = 0, addTextShadow = false, textShadowColor = 'rgba(0,0,0,0.5)',
+                            textShadowBlur = 10, textShadowOffsetX = 5, textShadowOffsetY = 5, textStrokeWidth = 0,
+                            textStrokeColor = '#000000', addTextBackground = false, textBackgroundColor = 'rgba(0,0,0,0.5)',
+                        } = layer;
+
+                        const fontSizeRem = fontSize / 32;
+                        const lines = text.split('\n');
+                        const totalLayerHeightRem = lines.length * fontSizeRem * 1.2;
+                        const yPercent = currentYPercent + totalLayerHeightRem / 2;
+                        currentYPercent += totalLayerHeightRem + (fontSizeRem * 0.5);
+
+                        const textStyle: React.CSSProperties = {
+                             position: 'absolute', top: `${yPercent}%`, left: '50%', transform: 'translateX(-50%) translateY(-50%)',
+                             color: textColor, fontSize: `${fontSizeRem}rem`, fontFamily: fontFamily,
+                             textAlign: textAlign as CanvasTextAlign, lineHeight: 1.2, whiteSpace: 'pre-wrap',
+                             letterSpacing: `${letterSpacing / 32}rem`,
+                             WebkitTextStroke: textStrokeWidth > 0 ? `${textStrokeWidth / 16}rem ${textStrokeColor}` : 'unset',
+                             textShadow: addTextShadow ? `${textShadowOffsetX/16}rem ${textShadowOffsetY/16}rem ${textShadowBlur/16}rem ${textShadowColor}` : 'none',
+                             backgroundColor: addTextBackground ? textBackgroundColor : 'transparent',
+                             padding: addTextBackground ? `${fontSizeRem / 4}rem` : '0',
+                             borderRadius: addTextBackground ? '0.25rem' : 'none',
+                             width: '90%',
+                         };
+
+                        return (
+                            <div key={`auto-${i}`} style={textStyle}>
+                                {lines.map((line: string, j: number) => <div key={j}>{line || ' '}</div>)}
                             </div>
                         )
                     })}

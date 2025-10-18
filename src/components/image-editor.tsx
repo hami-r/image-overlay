@@ -53,9 +53,16 @@ export function ImageEditor() {
   const [previewDim, setPreviewDim] = useState({ width: 1280, height: 720 });
 
   const handleLayerChange = (id: number, field: string, value: any) => {
-    setTextLayers(layers => layers.map(layer => 
-      layer.id === id ? { ...layer, [field]: value } : layer
-    ));
+    setTextLayers(layers => layers.map(layer => {
+      if (layer.id === id) {
+        const newLayer = { ...layer, [field]: value };
+        if (["fontSize", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY", "x", "y"].includes(field)) {
+          newLayer[field] = value === '' ? undefined : Number(value);
+        }
+        return newLayer;
+      }
+      return layer;
+    }));
   };
   
   const addLayer = () => {
@@ -205,19 +212,19 @@ export function ImageEditor() {
         if(background.includes('gradient')) {
             const colors = background.match(/#(?:[0-9a-fA-F]{3}){1,2}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)|hsl\(\s*\d+\s*,\s*[\d.]+\%\s*,\s*[\d.]+\%\s*\)/g);
             if (colors && colors.length >= 2) {
-                const directionMatch = background.match(/to (right|left|bottom|top)/);
+                const directionMatch = background.match(/to (right|left|bottom|top|bottom right|bottom left|top left|top right)/);
                 const direction = directionMatch ? directionMatch[1] : 'right';
                 let gradient;
 
-                if (direction === 'right') {
-                    gradient = ctx.createLinearGradient(0, 0, width, 0);
-                } else if (direction === 'left') {
-                    gradient = ctx.createLinearGradient(width, 0, 0, 0);
-                } else if (direction === 'bottom') {
-                    gradient = ctx.createLinearGradient(0, 0, 0, height);
-                } else { // top
-                    gradient = ctx.createLinearGradient(0, height, 0, 0);
-                }
+                if (direction === 'right') gradient = ctx.createLinearGradient(0, 0, width, 0);
+                else if (direction === 'left') gradient = ctx.createLinearGradient(width, 0, 0, 0);
+                else if (direction === 'bottom') gradient = ctx.createLinearGradient(0, 0, 0, height);
+                else if (direction === 'bottom right') gradient = ctx.createLinearGradient(0, 0, width, height);
+                else if (direction === 'bottom left') gradient = ctx.createLinearGradient(width, 0, 0, height);
+                else if (direction === 'top left') gradient = ctx.createLinearGradient(width, height, 0, 0);
+                else if (direction === 'top right') gradient = ctx.createLinearGradient(0, height, width, 0);
+                else gradient = ctx.createLinearGradient(0, height, 0, 0);
+
                 gradient.addColorStop(0, colors[0]);
                 gradient.addColorStop(1, colors[1]);
                 ctx.fillStyle = gradient;
@@ -351,6 +358,19 @@ export function ImageEditor() {
     background: background,
   };
 
+    // Auto-layout logic for preview
+    const autoPositionedLayers = textLayers.filter((l: any) => l.x === undefined || l.y === undefined);
+    const manualPositionedLayers = textLayers.filter((l: any) => l.x !== undefined && l.y !== undefined);
+
+    let totalAutoHeight = 0;
+    autoPositionedLayers.forEach((layer: any) => {
+        const lines = (layer.text || '').split('\n');
+        const fontSizeRem = (layer.fontSize || 64) / 32;
+        totalAutoHeight += (lines.length * (fontSizeRem * 1.2)) + (fontSizeRem * 0.5); // Padding
+    });
+    totalAutoHeight -= ((autoPositionedLayers[0]?.fontSize || 0) / 32) * 0.5;
+
+    let currentYPercent = (50 - (totalAutoHeight / 2));
   
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -394,11 +414,11 @@ export function ImageEditor() {
                                  <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor={`layer-x-${layer.id}`}>Position X</Label>
-                                        <Input id={`layer-x-${layer.id}`} type="number" placeholder={`${previewDim.width/2}`} value={layer.x} onChange={(e) => handleLayerChange(layer.id, 'x', parseInt(e.target.value))} />
+                                        <Input id={`layer-x-${layer.id}`} type="number" placeholder={`${previewDim.width/2}`} value={layer.x || ''} onChange={(e) => handleLayerChange(layer.id, 'x', e.target.value)} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor={`layer-y-${layer.id}`}>Position Y</Label>
-                                        <Input id={`layer-y-${layer.id}`} type="number" placeholder={`${previewDim.height/2}`} value={layer.y} onChange={(e) => handleLayerChange(layer.id, 'y', parseInt(e.target.value))} />
+                                        <Input id={`layer-y-${layer.id}`} type="number" placeholder={`${previewDim.height/2}`} value={layer.y || ''} onChange={(e) => handleLayerChange(layer.id, 'y', e.target.value)} />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -591,9 +611,10 @@ export function ImageEditor() {
               className="w-full flex flex-col items-center justify-center shadow-lg relative overflow-hidden"
               style={{ ...backgroundStyle, aspectRatio: `${previewDim.width} / ${previewDim.height}` }}
             >
-              {textLayers.map(layer => {
+              {manualPositionedLayers.map((layer:any, i:number) => {
                   const xPercent = ((layer.x ?? previewDim.width / 2) / previewDim.width) * 100;
                   const yPercent = ((layer.y ?? previewDim.height / 2) / previewDim.height) * 100;
+                  const fontSizeRem = layer.fontSize / 32;
 
                   let transform = 'translateY(-50%)';
                   let left = `${xPercent}%`;
@@ -604,27 +625,46 @@ export function ImageEditor() {
                   }
                   
                   const textStyle: React.CSSProperties = {
-                    position: 'absolute',
-                    top: `${yPercent}%`,
-                    left: left,
-                    transform: transform,
-                    color: layer.textColor,
-                    fontSize: `${layer.fontSize / 32}rem`, // Scale font size for preview
-                    fontFamily: layer.fontFamily,
-                    textAlign: layer.textAlign as CanvasTextAlign,
-                    lineHeight: 1.2,
-                    whiteSpace: 'pre-wrap',
-                    padding: '1rem',
+                    position: 'absolute', top: `${yPercent}%`, left: left, transform: transform,
+                    color: layer.textColor, fontSize: `${fontSizeRem}rem`, fontFamily: layer.fontFamily,
+                    textAlign: layer.textAlign as CanvasTextAlign, lineHeight: 1.2, whiteSpace: 'pre-wrap',
                     letterSpacing: `${layer.letterSpacing / 32}rem`,
                     WebkitTextStroke: layer.textStrokeWidth > 0 ? `${layer.textStrokeWidth / 16}rem ${layer.textStrokeColor}` : 'unset',
                     textShadow: layer.addTextShadow ? `${layer.textShadowOffsetX/16}rem ${layer.textShadowOffsetY/16}rem ${layer.textShadowBlur/16}rem ${layer.textShadowColor}` : 'none',
                     backgroundColor: layer.addTextBackground ? layer.textBackgroundColor : 'transparent',
+                    padding: layer.addTextBackground ? `${fontSizeRem / 4}rem` : '0',
                     borderRadius: layer.addTextBackground ? '0.25rem' : 'none',
                   };
                   return (
-                     <div key={layer.id} style={textStyle}>
-                        {layer.text.split('\n').map((line, i) => <div key={i}>{line || ' '}</div>)}
+                     <div key={`manual-${layer.id}`} style={textStyle}>
+                        {layer.text.split('\n').map((line:string, j:number) => <div key={j}>{line || ' '}</div>)}
                      </div>
+                  )
+              })}
+              {autoPositionedLayers.map((layer: any) => {
+                  const fontSizeRem = layer.fontSize / 32;
+                  const lines = layer.text.split('\n');
+                  const totalLayerHeightRem = lines.length * fontSizeRem * 1.2;
+                  const yPercent = currentYPercent + totalLayerHeightRem / 2;
+                  currentYPercent += totalLayerHeightRem + (fontSizeRem * 0.5);
+
+                  const textStyle: React.CSSProperties = {
+                      position: 'absolute', top: `${yPercent}%`, left: '50%', transform: 'translateX(-50%) translateY(-50%)',
+                      color: layer.textColor, fontSize: `${fontSizeRem}rem`, fontFamily: layer.fontFamily,
+                      textAlign: layer.textAlign as CanvasTextAlign, lineHeight: 1.2, whiteSpace: 'pre-wrap',
+                      letterSpacing: `${layer.letterSpacing / 32}rem`,
+                      WebkitTextStroke: layer.textStrokeWidth > 0 ? `${layer.textStrokeWidth / 16}rem ${layer.textStrokeColor}` : 'unset',
+                      textShadow: layer.addTextShadow ? `${layer.textShadowOffsetX/16}rem ${layer.textShadowOffsetY/16}rem ${layer.textShadowBlur/16}rem ${layer.textShadowColor}` : 'none',
+                      backgroundColor: layer.addTextBackground ? layer.textBackgroundColor : 'transparent',
+                      padding: layer.addTextBackground ? `${fontSizeRem / 4}rem` : '0',
+                      borderRadius: layer.addTextBackground ? '0.25rem' : 'none',
+                      width: '90%',
+                  };
+
+                  return (
+                      <div key={`auto-${layer.id}`} style={textStyle}>
+                          {lines.map((line: string, i: number) => <div key={i}>{line || ' '}</div>)}
+                      </div>
                   )
               })}
             </div>

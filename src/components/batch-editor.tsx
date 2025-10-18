@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -388,18 +389,54 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
             const autoPositionedLayers = textLayers.filter((l: any) => l.x === undefined || l.y === undefined);
             const manualPositionedLayers = textLayers.filter((l: any) => l.x !== undefined && l.y !== undefined);
 
-            let totalAutoHeight = 0;
-            autoPositionedLayers.forEach((layer: any) => {
-                const lines = (layer.text || '').split('\n');
-                totalAutoHeight += (lines.length * (layer.fontSize * 1.2)) + (layer.fontSize * 0.5); // Padding
-            });
-            if (autoPositionedLayers.length > 0) {
-              totalAutoHeight -= (autoPositionedLayers[0]?.fontSize || 0) * 0.5; // No padding before first item
-            }
-
-            let currentY = (height - totalAutoHeight) / 2;
-
             const allLayersToDraw = [...autoPositionedLayers, ...manualPositionedLayers];
+
+            let autoY = 0;
+            const autoLayerHeights: { [id: number]: number } = {};
+            
+            // First pass: calculate heights for auto-positioned layers
+            allLayersToDraw.forEach((layer: any) => {
+                 const { text = "", fontSize = 64, fontFamily = "'Inter', sans-serif" } = layer;
+                const isAuto = layer.x === undefined || layer.y === undefined;
+
+                if (isAuto) {
+                    ctx.font = `${fontSize}px ${fontFamily}`;
+                    const lineHeight = fontSize * 1.2;
+                    const textPadding = width * 0.1; // 10% padding
+                    const maxWidth = width - textPadding;
+
+                    const manualLines = text.split('\n');
+                    let wrappedLines: string[] = [];
+
+                    manualLines.forEach(line => {
+                        let currentLine = '';
+                        const words = line.split(' ');
+                        for (const word of words) {
+                            const testLine = currentLine + word + ' ';
+                            const metrics = ctx.measureText(testLine);
+                            if (metrics.width > maxWidth && currentLine.length > 0) {
+                                wrappedLines.push(currentLine.trim());
+                                currentLine = word + ' ';
+                            } else {
+                                currentLine = testLine;
+                            }
+                        }
+                        wrappedLines.push(currentLine.trim());
+                    });
+                    
+                    const totalLayerHeight = wrappedLines.length * lineHeight;
+                    autoLayerHeights[layer.id] = totalLayerHeight;
+                    autoY += totalLayerHeight + (fontSize * 0.5); // Padding
+                }
+            });
+
+            if (Object.keys(autoLayerHeights).length > 0) {
+                const firstLayerId = Object.keys(autoLayerHeights)[0];
+                const firstLayer = allLayersToDraw.find(l => l.id === parseInt(firstLayerId));
+                autoY -= (firstLayer?.fontSize || 0) * 0.5; // No padding before first item
+            }
+            
+            let currentY = (height - autoY) / 2;
 
             allLayersToDraw.forEach((layer: any) => {
                 const {
@@ -426,23 +463,44 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
                     ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
                 }
-
-                const lines = text.split('\n');
+                
                 const lineHeight = fontSize * 1.2;
-                const totalLayerHeight = lines.length * lineHeight;
+                const textPadding = width * 0.1; // 10% padding
+                const maxWidth = width - textPadding;
+
+                const manualLines = text.split('\n');
+                let wrappedLines: string[] = [];
+
+                manualLines.forEach(line => {
+                    let currentLine = '';
+                    const words = line.split(' ');
+                    for (const word of words) {
+                        const testLine = currentLine + word + ' ';
+                        const metrics = ctx.measureText(testLine);
+                        if (metrics.width > maxWidth && currentLine.length > 0) {
+                            wrappedLines.push(currentLine.trim());
+                            currentLine = word + ' ';
+                        } else {
+                            currentLine = testLine;
+                        }
+                    }
+                    wrappedLines.push(currentLine.trim());
+                });
+
+                const totalLayerHeight = wrappedLines.length * lineHeight;
                 
                 if (isAuto) {
                     x = width / 2;
-                    y = currentY + totalLayerHeight / 2;
-                    currentY += totalLayerHeight + (fontSize * 0.5);
+                    y = currentY + (autoLayerHeights[layer.id] / 2);
+                    currentY += autoLayerHeights[layer.id] + (fontSize * 0.5);
                 } else {
                     x = layer.x!;
                     y = layer.y!;
                 }
-
+                
                 let startY = y - totalLayerHeight / 2;
                 
-                lines.forEach((line: string, lineIndex: number) => {
+                wrappedLines.forEach((line: string, lineIndex: number) => {
                     const currentLineY = startY + lineIndex * lineHeight + lineHeight / 2;
                     
                     if (addTextBackground) {

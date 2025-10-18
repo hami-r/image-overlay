@@ -336,7 +336,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
         canvas.style.width = '100%';
         canvas.style.height = '100%';
 
-        const drawBackground = new Promise<void>((bgResolve) => {
+        const drawBackground = new Promise<void>((bgResolve, bgReject) => {
             if (backgroundImage) {
                 const img = new Image();
                 img.crossOrigin = "anonymous";
@@ -344,11 +344,8 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     ctx.drawImage(img, 0, 0, width, height);
                     bgResolve();
                 };
-                img.onerror = (e) => {
-                    console.error("Error loading image for canvas:", e);
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, width, height);
-                    bgResolve();
+                img.onerror = () => {
+                    bgReject(new Error(`Failed to load image from ${backgroundImage.substring(0,100)}... Check URL and CORS policy.`));
                 };
                 img.src = backgroundImage;
             } else {
@@ -473,7 +470,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                 });
             });
             resolve();
-        });
+        }).catch(reject);
     });
 };
 
@@ -911,9 +908,15 @@ export function BatchEditor() {
                 drawOnCanvas(canvas, {
                     ...config,
                     dpr: 1, // Lower DPR for previews
+                }).catch(err => {
+                    toast({
+                        variant: "destructive",
+                        title: `Preview Error (Image ${index+1})`,
+                        description: err.message
+                    });
                 });
             }
-        }, [config]);
+        }, [config, index]);
     
         return (
             <div className="flex flex-col gap-2">
@@ -1132,5 +1135,7 @@ export function BatchEditor() {
         </div>
     );
 }
+
+    
 
     

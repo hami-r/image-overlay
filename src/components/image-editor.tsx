@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -60,7 +61,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
         canvas.style.width = '100%';
         canvas.style.height = '100%';
 
-        const drawBackground = new Promise<void>((bgResolve) => {
+        const drawBackground = new Promise<void>((bgResolve, bgReject) => {
             if (backgroundImage) {
                 const img = new Image();
                 img.crossOrigin = "anonymous";
@@ -68,11 +69,8 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     ctx.drawImage(img, 0, 0, width, height);
                     bgResolve();
                 };
-                img.onerror = (e) => {
-                    console.error("Error loading image for canvas:", e);
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, width, height);
-                    bgResolve();
+                img.onerror = () => {
+                    bgReject(new Error(`Failed to load image from ${backgroundImage.substring(0,100)}... Check URL and CORS policy.`));
                 };
                 img.src = backgroundImage;
             } else {
@@ -193,7 +191,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                 });
             });
             resolve();
-        });
+        }).catch(reject);
     });
 };
 
@@ -220,9 +218,15 @@ export function ImageEditor() {
         width: previewDim.width,
         height: previewDim.height,
         dpr: 1, // Use lower DPR for preview for performance
+      }).catch(err => {
+        toast({
+            variant: "destructive",
+            title: "Preview Error",
+            description: err.message
+        });
       });
     }
-  }, [textLayers, background, backgroundImageSrc, previewDim]);
+  }, [textLayers, background, backgroundImageSrc, previewDim, toast]);
 
   const handleLayerChange = (id: number, field: string, value: any) => {
     setTextLayers(layers => layers.map(layer => {
@@ -638,5 +642,7 @@ export function ImageEditor() {
     </div>
   );
 }
+
+    
 
     

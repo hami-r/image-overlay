@@ -40,7 +40,11 @@ Each object in the `textLayers` array defines a block of text and has the follow
 | `fontFamily`        | `string`                     | `"'Inter', sans-serif"`   | The font family for the text. Should be a valid CSS `font-family` value.                              |
 | `fontSize`          | `number`                     | `64`                      | The font size in pixels.                                                                                |
 | `textAlign`         | `'left'`, `'center'`, `'right'` | `'center'`                | The horizontal alignment of the text.                                                                   |
+| `x`                 | `number`                     | (image center)            | The horizontal position (X-coordinate) of the text's center.                                            |
+| `y`                 | `number`                     | (image center)            | The vertical position (Y-coordinate) of the text's center.                                              |
 | `letterSpacing`     | `number`                     | `0`                       | The spacing between characters in pixels. Can be negative.                                              |
+| `addTextBackground` | `boolean`                    | `false`                   | Set to `true` to draw a background color behind the text.                                               |
+| `textBackgroundColor` | `string`                   | `'rgba(0, 0, 0, 0.5)'`    | The color of the text's background.                                                                     |
 | `addTextShadow`     | `boolean`                    | `false`                   | Set to `true` to enable the text shadow.                                                                |
 | `textShadowColor`   | `string`                     | `'rgba(0,0,0,0.5)'`       | The color of the text shadow.                                                                           |
 | `textShadowBlur`    | `number`                     | `10`                      | The blur radius of the shadow in pixels.                                                                |
@@ -82,27 +86,28 @@ Each object in the `textLayers` array defines a block of text and has the follow
     "textLayers": [
       {
         "text": "Batch\nCreation\nRocks!",
-        "textColor": "#000000",
-        "fontSize": 96,
+        "textColor": "#FFFFFF",
+        "fontSize": 128,
         "fontFamily": "'Playfair Display', serif",
         "addTextShadow": true,
-        "textShadowBlur": 5
+        "textShadowBlur": 5,
+        "x": 540,
+        "y": 480
       },
       {
         "text": "So easy!",
-        "textColor": "#333333",
-        "fontSize": 48,
+        "textColor": "#FFFFFF",
+        "fontSize": 64,
         "fontFamily": "'Inter', sans-serif",
-        "textStrokeWidth": 1,
-        "textStrokeColor": "#FFFFFF"
+        "textStrokeWidth": 2,
+        "textStrokeColor": "#000000",
+        "x": 540,
+        "y": 800
       }
     ],
     "background": "#C1E1C1",
     "width": 1080,
-    "height": 1080,
-    "textAlign": "center"
+    "height": 1080
   }
 ]
 ```
-
-    

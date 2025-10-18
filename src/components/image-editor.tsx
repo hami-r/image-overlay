@@ -13,12 +13,10 @@ import { Slider } from '@/components/ui/slider';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { fontFamilies } from '@/lib/fonts';
 import { backgroundPatterns } from '@/lib/backgrounds';
-import { AlignLeft, AlignCenter, AlignRight, CaseUpper, CaseLower, Pilcrow, Heading1, Upload, Download, Sparkles, Bot, Shuffle, Link, PlusCircle, Trash2 } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, Upload, Download, Sparkles, Bot, Shuffle, Link, PlusCircle, Trash2 } from 'lucide-react';
 import { generateBackgroundImage } from '@/ai/flows/generate-background-image';
 import { useToast } from '@/hooks/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
-
-type CaseType = 'normal' | 'uppercase' | 'lowercase' | 'titlecase' | 'pascalcase';
 
 const defaultTextLayer = {
   id: Date.now(),
@@ -27,6 +25,8 @@ const defaultTextLayer = {
   fontSize: 64,
   fontFamily: fontFamilies[0].family,
   textAlign: 'center' as 'left' | 'center' | 'right',
+  x: 640,
+  y: 360,
   letterSpacing: 0,
   addTextShadow: false,
   textShadowColor: 'rgba(0,0,0,0.5)',
@@ -73,23 +73,6 @@ export function ImageEditor() {
         });
     }
   };
-
-
-  const transformText = useCallback((inputText: string, caseType: CaseType) => {
-    switch (caseType) {
-      case 'uppercase':
-        return inputText.toUpperCase();
-      case 'lowercase':
-        return inputText.toLowerCase();
-      case 'titlecase':
-        return inputText.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase());
-      case 'pascalcase':
-        return inputText.replace(/(?:^|\s)\w/g, (match) => match.trim().toUpperCase()).replace(/\s/g, '');
-      case 'normal':
-      default:
-        return inputText;
-    }
-  }, []);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -179,35 +162,7 @@ export function ImageEditor() {
   
     const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
         if (!text) return [];
-        const words = text.split(' ');
-        let lines: string[] = [];
-        let currentLine = words[0] || '';
-
-        for (let i = 1; i < words.length; i++) {
-            const word = words[i];
-            const width = ctx.measureText(currentLine + " " + word).width;
-            if (width < maxWidth && !word.includes('\n')) {
-                currentLine += " " + word;
-            } else {
-                const subWords = word.split('\n');
-                for (let j = 0; j < subWords.length; j++) {
-                    if (j > 0) {
-                        lines.push(currentLine);
-                        currentLine = subWords[j];
-                    } else {
-                        const newWidth = ctx.measureText(currentLine + " " + subWords[j]).width;
-                        if (newWidth < maxWidth) {
-                            currentLine += " " + subWords[j];
-                        } else {
-                            lines.push(currentLine);
-                            currentLine = subWords[j];
-                        }
-                    }
-                }
-            }
-        }
-        lines.push(currentLine);
-        return lines.flatMap(line => line.split('\n'));
+        return text.split('\n');
     };
 
   const handleDownload = () => {
@@ -276,26 +231,15 @@ export function ImageEditor() {
     });
 
     drawBackground.then(() => {
-        let totalTextHeight = 0;
-        const lineHeights: number[] = [];
-        
-        textLayers.forEach(layer => {
-            const lineHeight = layer.fontSize * 1.2;
-            ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
-            const lines = wrapText(ctx, layer.text, width - 80);
-            totalTextHeight += (lines.length) * lineHeight;
-            lineHeights.push(lineHeight);
-        });
-        
-        let currentY = (height - totalTextHeight) / 2;
-
-        textLayers.forEach((layer, layerIndex) => {
+        textLayers.forEach((layer) => {
             const {
                 text,
                 textColor,
                 fontSize,
                 fontFamily,
                 textAlign,
+                x,
+                y,
                 letterSpacing,
                 addTextShadow,
                 textShadowColor,
@@ -326,28 +270,35 @@ export function ImageEditor() {
                 ctx.shadowOffsetY = 0;
             }
 
-            const padding = 80;
-            const maxTextWidth = width - padding;
-            const lines = wrapText(ctx, text, maxTextWidth);
+            const lines = wrapText(ctx, text, previewDim.width - 80);
+            const lineHeight = fontSize * 1.2;
+            const totalTextHeight = lines.length * lineHeight;
+            let startY = y - totalTextHeight / 2;
 
-            const lineHeight = lineHeights[layerIndex];
-            
-            lines.forEach((line: string) => {
-                let x;
-                switch (textAlign) {
-                    case 'left': x = padding / 2; break;
-                    case 'right': x = width - (padding / 2); break;
-                    case 'center': default: x = width / 2; break;
-                }
+
+            lines.forEach((line: string, index: number) => {
+                const currentY = startY + index * lineHeight + lineHeight / 2;
                 
                 if (addTextBackground) {
                     const textMetrics = ctx.measureText(line);
-                    const textWidth = textMetrics.width;
+                    let actualLeft = textMetrics.actualBoundingBoxLeft;
+                    let actualRight = textMetrics.actualBoundingBoxRight;
+                    const textWidth = actualLeft + actualRight;
+
                     const bgPadding = fontSize / 4;
-                    const currentShadow = ctx.shadowColor;
+                    const currentShadow = ctx.shadowColor; //
                     ctx.shadowColor = 'transparent';
                     ctx.fillStyle = textBackgroundColor;
-                    let rectX = (textAlign === 'center') ? x - textWidth / 2 - bgPadding : (textAlign === 'left') ? x - bgPadding : x - textWidth - bgPadding;
+                    
+                    let rectX;
+                    if (textAlign === 'center') {
+                        rectX = x - textWidth / 2 - bgPadding;
+                    } else if (textAlign === 'left') {
+                        rectX = x - bgPadding;
+                    } else { // right
+                        rectX = x - textWidth - bgPadding;
+                    }
+                    
                     const rectY = currentY - (lineHeight/2) - bgPadding/2;
                     ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
                     ctx.shadowColor = currentShadow;
@@ -361,9 +312,7 @@ export function ImageEditor() {
                 }
 
                 ctx.fillText(line, x, currentY);
-                currentY += lineHeight;
             });
-             currentY += lineHeight / 2; // Add some space between layers
         });
 
         const link = document.createElement('a');
@@ -439,6 +388,16 @@ export function ImageEditor() {
                                         {fontFamilies.map(font => <SelectItem key={font.name} value={font.family} style={{ fontFamily: font.family }}>{font.name}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
+                                    </div>
+                                </div>
+                                 <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor={`layer-x-${layer.id}`}>Position X</Label>
+                                        <Input id={`layer-x-${layer.id}`} type="number" value={layer.x} onChange={(e) => handleLayerChange(layer.id, 'x', parseInt(e.target.value) || 0)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor={`layer-y-${layer.id}`}>Position Y</Label>
+                                        <Input id={`layer-y-${layer.id}`} type="number" value={layer.y} onChange={(e) => handleLayerChange(layer.id, 'y', parseInt(e.target.value) || 0)} />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -633,6 +592,10 @@ export function ImageEditor() {
             >
               {textLayers.map(layer => {
                   const textStyle: React.CSSProperties = {
+                    position: 'absolute',
+                    top: `${(layer.y / previewDim.height) * 100}%`,
+                    left: `${(layer.x / previewDim.width) * 100}%`,
+                    transform: `translate(-50%, -50%)`,
                     color: layer.textColor,
                     fontSize: `${layer.fontSize / 32}rem`, // Scale font size for preview
                     fontFamily: layer.fontFamily,

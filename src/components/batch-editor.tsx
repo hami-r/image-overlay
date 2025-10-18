@@ -144,6 +144,8 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
             fontSize: 64,
             fontFamily: "'Inter', sans-serif",
             textAlign: 'center',
+            x: config.width / 2 || 640,
+            y: config.height / 2 || 360
         };
         onConfigChange('textLayers', [...textLayers, newLayer]);
     }
@@ -186,6 +188,16 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
                                         </Select>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`layer-x-${index}-${layerIndex}`}>Position X</Label>
+                                            <Input id={`layer-x-${index}-${layerIndex}`} type="number" value={layer.x} onChange={(e) => onConfigChange('x', e.target.value, layer.id)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`layer-y-${index}-${layerIndex}`}>Position Y</Label>
+                                            <Input id={`layer-y-${index}-${layerIndex}`} type="number" value={layer.y} onChange={(e) => onConfigChange('y', e.target.value, layer.id)} />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                             <Label htmlFor={`font-size-${index}-${layerIndex}`}>Font Size</Label>
                                             <Input id={`font-size-${index}-${layerIndex}`} type="number" value={layer.fontSize} onChange={(e) => onConfigChange('fontSize', e.target.value, layer.id)} />
@@ -207,6 +219,18 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
                                                     <Label>Letter Spacing: {layer.letterSpacing || 0}px</Label>
                                                     <Slider value={[layer.letterSpacing || 0]} onValueChange={([val]) => onConfigChange('letterSpacing', val, layer.id)} min={-10} max={50} step={1} />
                                                 </div>
+                                                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                                                    <div className="space-y-0.5">
+                                                        <Label>Text Background</Label>
+                                                    </div>
+                                                    <Switch checked={layer.addTextBackground} onCheckedChange={(checked) => onConfigChange('addTextBackground', checked, layer.id)} />
+                                                </div>
+                                                {layer.addTextBackground && (
+                                                    <div className="space-y-2 border p-3 rounded-lg">
+                                                        <Label htmlFor={`text-bg-color-${index}-${layerIndex}`}>BG Color</Label>
+                                                        <Input id={`text-bg-color-${index}-${layerIndex}`} type="color" value={layer.textBackgroundColor || '#000000'} onChange={(e) => onConfigChange('textBackgroundColor', e.target.value, layer.id)} className="p-1 h-10"/>
+                                                    </div>
+                                                )}
                                                 <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
                                                     <div className="space-y-0.5">
                                                         <Label>Text Stroke</Label>
@@ -464,37 +488,9 @@ export function BatchEditor() {
         }
     };
 
-    const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
+    const wrapText = (ctx: CanvasRenderingContext2D, text: string): string[] => {
         if (!text) return [];
-        const words = text.split(' ');
-        let lines: string[] = [];
-        let currentLine = words[0] || '';
-
-        for (let i = 1; i < words.length; i++) {
-            const word = words[i];
-            const width = ctx.measureText(currentLine + " " + word).width;
-            if (width < maxWidth && !word.includes('\n')) {
-                currentLine += " " + word;
-            } else {
-                const subWords = word.split('\n');
-                for (let j = 0; j < subWords.length; j++) {
-                    if (j > 0) {
-                        lines.push(currentLine);
-                        currentLine = subWords[j];
-                    } else {
-                        const newWidth = ctx.measureText(currentLine + " " + subWords[j]).width;
-                        if (newWidth < maxWidth) {
-                            currentLine += " " + subWords[j];
-                        } else {
-                            lines.push(currentLine);
-                            currentLine = subWords[j];
-                        }
-                    }
-                }
-            }
-        }
-        lines.push(currentLine);
-        return lines.flatMap(line => line.split('\n'));
+        return text.split('\n');
     };
 
 
@@ -561,34 +557,21 @@ export function BatchEditor() {
             });
 
             drawBackground.then(() => {
-                let totalTextHeight = 0;
-                const layerLineHeights: { [key: number]: number } = {};
-                const allLines: string[][] = [];
-        
-                textLayers.forEach((layer: any, layerIndex: number) => {
-                    const lineHeight = (layer.fontSize || 64) * 1.2;
-                    ctx.font = `${layer.fontSize || 64}px ${layer.fontFamily || "'Inter', sans-serif"}`;
-                    const lines = wrapText(ctx, layer.text, width - 80);
-                    allLines.push(lines);
-                    layerLineHeights[layerIndex] = lineHeight;
-                    totalTextHeight += lines.length * lineHeight;
-                });
-                
-                let currentY = (height - totalTextHeight) / 2;
-
-                textLayers.forEach((layer: any, layerIndex: number) => {
+                textLayers.forEach((layer: any) => {
                     const {
                         text, textColor = '#000000', fontSize = 64, fontFamily = "'Inter', sans-serif",
                         textAlign = 'center', letterSpacing = 0, addTextShadow = false,
                         textShadowColor = 'rgba(0,0,0,0.5)', textShadowBlur = 10,
                         textShadowOffsetX = 5, textShadowOffsetY = 5, textStrokeWidth = 0,
-                        textStrokeColor = '#000000',
+                        textStrokeColor = '#000000', addTextBackground = false, textBackgroundColor = 'rgba(0,0,0,0.5)',
+                        x = width / 2, y = height / 2
                     } = layer;
                     
                     ctx.font = `${fontSize}px ${fontFamily}`;
                     ctx.fillStyle = textColor;
                     ctx.textAlign = textAlign as CanvasTextAlign;
                     ctx.letterSpacing = `${letterSpacing}px`;
+                    ctx.textBaseline = 'middle';
 
                     if (addTextShadow) {
                         ctx.shadowColor = textShadowColor;
@@ -602,27 +585,44 @@ export function BatchEditor() {
                         ctx.shadowOffsetY = 0;
                     }
 
-                    const padding = 80;
-                    const maxTextWidth = width - padding;
-                    const lines = allLines[layerIndex];
-                    const lineHeight = layerLineHeights[layerIndex];
+                    const lines = wrapText(ctx, text);
+                    const lineHeight = fontSize * 1.2;
+                    const totalTextHeight = lines.length * lineHeight;
+                    let startY = y - totalTextHeight / 2;
 
                     lines.forEach((line: string, lineIndex: number) => {
-                        const y = currentY + (lineHeight / 2);
-                        let x;
-                        switch (textAlign) {
-                            case 'left': x = padding / 2; break;
-                            case 'right': x = width - (padding / 2); break;
-                            case 'center': default: x = width / 2; break;
-                        }
+                        const currentY = startY + lineIndex * lineHeight + lineHeight / 2;
                         
+                        if (addTextBackground) {
+                            const textMetrics = ctx.measureText(line);
+                            const textWidth = textMetrics.width;
+                            const bgPadding = fontSize / 4;
+                            const currentShadow = ctx.shadowColor;
+                            ctx.shadowColor = 'transparent';
+                            ctx.fillStyle = textBackgroundColor;
+
+                            let rectX;
+                            if (textAlign === 'center') {
+                                rectX = x - textWidth / 2 - bgPadding;
+                            } else if (textAlign === 'left') {
+                                rectX = x - bgPadding;
+                            } else { // right
+                                rectX = x - textWidth - bgPadding;
+                            }
+                            
+                            const rectY = currentY - (lineHeight/2) - bgPadding/2;
+                            ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
+                            
+                            ctx.shadowColor = currentShadow;
+                            ctx.fillStyle = textColor;
+                        }
+
                         if (textStrokeWidth > 0) {
                             ctx.strokeStyle = textStrokeColor;
                             ctx.lineWidth = textStrokeWidth;
-                            ctx.strokeText(line, x, y);
+                            ctx.strokeText(line, x, currentY);
                         }
-                        ctx.fillText(line, x, y);
-                        currentY += lineHeight;
+                        ctx.fillText(line, x, currentY);
                     });
                 });
 
@@ -641,13 +641,8 @@ export function BatchEditor() {
         
         if (field === 'textLayers' || layerId !== undefined) {
              let targetLayerId = layerId;
-             // Find layer by index if id is missing
-            if (layerId === undefined) {
-                const layerIndex = newConfig.textLayers.findIndex((l:any) => l.id === undefined);
-                if (layerIndex !== -1) targetLayerId = newConfig.textLayers[layerIndex].id;
-            }
 
-            if (targetLayerId !== undefined) {
+             if (targetLayerId !== undefined) {
                  newConfig.textLayers = newConfig.textLayers.map((l:any) => 
                      l.id === targetLayerId ? { ...l, [field]: value } : l
                  );
@@ -658,7 +653,7 @@ export function BatchEditor() {
             newConfig[field] = value;
         }
         
-        if (["fontSize", "width", "height", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY"].includes(field)) {
+        if (["fontSize", "width", "height", "letterSpacing", "textStrokeWidth", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY", "x", "y"].includes(field)) {
              if (layerId !== undefined) {
                   newConfig.textLayers = newConfig.textLayers.map((l:any) => 
                      l.id === layerId ? { ...l, [field]: Number(value) } : l
@@ -898,7 +893,7 @@ export function BatchEditor() {
             <div key={index} className="flex flex-col gap-2">
                 <p className="text-sm font-medium text-muted-foreground">Preview {index + 1}</p>
                 <div 
-                    className="w-full flex flex-col items-center justify-center shadow-lg rounded-md bg-card-foreground/5"
+                    className="w-full flex flex-col items-center justify-center shadow-lg rounded-md bg-card-foreground/5 relative"
                     style={{ ...backgroundStyle, aspectRatio: `${width} / ${height}` }}
                 >
                     {textLayers.map((layer:any, i:number) => {
@@ -916,9 +911,17 @@ export function BatchEditor() {
                             textShadowOffsetY = 5,
                             textStrokeWidth = 0,
                             textStrokeColor = '#000000',
+                            addTextBackground = false,
+                            textBackgroundColor = 'rgba(0,0,0,0.5)',
+                            x,
+                            y,
                         } = layer;
                         
                         const textStyle: React.CSSProperties = {
+                            position: 'absolute',
+                            top: y !== undefined ? `${(y / height) * 100}%` : '50%',
+                            left: x !== undefined ? `${(x / width) * 100}%` : '50%',
+                            transform: 'translate(-50%, -50%)',
                             color: textColor,
                             fontSize: `${fontSize / 32}rem`,
                             fontFamily: fontFamily,
@@ -930,6 +933,7 @@ export function BatchEditor() {
                             letterSpacing: `${letterSpacing / 32}rem`,
                             WebkitTextStroke: textStrokeWidth > 0 ? `${textStrokeWidth / 16}rem ${textStrokeColor}` : 'unset',
                             textShadow: addTextShadow ? `${textShadowOffsetX/16}rem ${textShadowOffsetY/16}rem ${textShadowBlur/16}rem ${textShadowColor}` : 'none',
+                            backgroundColor: addTextBackground ? textBackgroundColor : 'transparent',
                         };
 
                         return (
@@ -1117,5 +1121,3 @@ export function BatchEditor() {
         </div>
     );
 }
-
-    

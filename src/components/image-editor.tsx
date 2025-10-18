@@ -57,8 +57,8 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
         canvas.width = width * dpr;
         canvas.height = height * dpr;
         ctx.scale(dpr, dpr);
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
 
         const drawBackground = new Promise<void>((bgResolve) => {
             if (backgroundImage) {
@@ -112,7 +112,9 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                 const lines = (layer.text || '').split('\n');
                 totalAutoHeight += (lines.length * (layer.fontSize * 1.2)) + (layer.fontSize * 0.5); // Padding
             });
-            totalAutoHeight -= (autoPositionedLayers[0]?.fontSize || 0) * 0.5; // No padding before first item
+            if (autoPositionedLayers.length > 0) {
+              totalAutoHeight -= (autoPositionedLayers[0]?.fontSize || 0) * 0.5; // No padding before first item
+            }
 
             let currentY = (height - totalAutoHeight) / 2;
 

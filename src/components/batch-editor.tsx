@@ -69,6 +69,44 @@ const exampleJson = [
     "background": "#C1E1C1",
     "width": 1080,
     "height": 1080
+  },
+  {
+    "textLayers": [
+       {
+        "text": "Batch\nCreation\nRocks!",
+        "textColor": "#FFFFFF",
+        "fontSize": 128,
+        "fontFamily": "'Playfair Display', serif",
+        "addTextShadow": true,
+        "textShadowBlur": 5,
+        "x": 540,
+        "y": 480
+      },
+      {
+        "text": "So easy!",
+        "textColor": "#FFFFFF",
+        "fontSize": 64,
+        "fontFamily": "'Inter', sans-serif",
+        "textStrokeWidth": 2,
+        "textStrokeColor": "#000000",
+        "x": 540,
+        "y": 800
+      }
+    ],
+    "background": "#C1E1C1",
+    "width": 1080,
+    "height": 1080
+  },
+  {
+    "textLayers": [
+       {
+        "text": "Using an Image URL",
+        "textColor": "#000000",
+        "fontSize": 80,
+        "addTextShadow": true
+      }
+    ],
+    "backgroundImage": "https://images.unsplash.com/photo-1554034483-04fda0d3507b?q=80&w=2070"
   }
 ];
 
@@ -917,11 +955,21 @@ export function BatchEditor() {
                             y,
                         } = layer;
                         
+                         const xPercent = (x / width) * 100;
+                         const yPercent = (y / height) * 100;
+
+                        let transform = 'translateY(-50%)';
+                        if (textAlign === 'center') {
+                            transform = 'translateX(-50%) translateY(-50%)';
+                        } else if (textAlign === 'right') {
+                            transform = 'translateX(-100%) translateY(-50%)';
+                        }
+                        
                         const textStyle: React.CSSProperties = {
                             position: 'absolute',
-                            top: y !== undefined ? `${(y / height) * 100}%` : '50%',
-                            left: x !== undefined ? `${(x / width) * 100}%` : '50%',
-                            transform: 'translate(-50%, -50%)',
+                            top: y !== undefined ? `${yPercent}%` : '50%',
+                            left: x !== undefined ? `${xPercent}%` : '50%',
+                            transform: transform,
                             color: textColor,
                             fontSize: `${fontSize / 32}rem`,
                             fontFamily: fontFamily,

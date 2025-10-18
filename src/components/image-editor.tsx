@@ -160,7 +160,7 @@ export function ImageEditor() {
     }
   };
   
-    const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
+    const wrapText = (ctx: CanvasRenderingContext2D, text: string): string[] => {
         if (!text) return [];
         return text.split('\n');
     };
@@ -270,28 +270,26 @@ export function ImageEditor() {
                 ctx.shadowOffsetY = 0;
             }
 
-            const lines = wrapText(ctx, text, previewDim.width - 80);
+            const lines = wrapText(ctx, text);
             const lineHeight = fontSize * 1.2;
+            
             const totalTextHeight = lines.length * lineHeight;
             let startY = y - totalTextHeight / 2;
-
 
             lines.forEach((line: string, index: number) => {
                 const currentY = startY + index * lineHeight + lineHeight / 2;
                 
                 if (addTextBackground) {
                     const textMetrics = ctx.measureText(line);
-                    let actualLeft = textMetrics.actualBoundingBoxLeft;
-                    let actualRight = textMetrics.actualBoundingBoxRight;
-                    const textWidth = actualLeft + actualRight;
+                    const textWidth = textMetrics.width;
 
                     const bgPadding = fontSize / 4;
-                    const currentShadow = ctx.shadowColor; //
+                    const currentShadow = ctx.shadowColor;
                     ctx.shadowColor = 'transparent';
                     ctx.fillStyle = textBackgroundColor;
                     
                     let rectX;
-                    if (textAlign === 'center') {
+                     if (textAlign === 'center') {
                         rectX = x - textWidth / 2 - bgPadding;
                     } else if (textAlign === 'left') {
                         rectX = x - bgPadding;
@@ -363,7 +361,7 @@ export function ImageEditor() {
           <Accordion type="multiple" defaultValue={[`layer-${textLayers[0]?.id}`]} className="w-full">
             <AccordionItem value="text-layers">
                 <AccordionTrigger>Text Layers</AccordionTrigger>
-                <AccordionContent className="space-y-4">
+                <AccordionContent className="space-y-4 pt-4">
                     <Accordion type="multiple" defaultValue={[`layer-${textLayers[0]?.id}`]} className="w-full">
                      {textLayers.map((layer, index) => (
                         <AccordionItem key={layer.id} value={`layer-${layer.id}`}>
@@ -420,7 +418,7 @@ export function ImageEditor() {
                                 <Accordion type="single" collapsible className="w-full">
                                     <AccordionItem value="text-style">
                                         <AccordionTrigger>Styling</AccordionTrigger>
-                                        <AccordionContent className="space-y-4">
+                                        <AccordionContent className="space-y-4 pt-4">
                                             <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
                                                 <div className="space-y-0.5">
                                                     <Label>Text Background</Label>
@@ -591,11 +589,21 @@ export function ImageEditor() {
               style={{ ...backgroundStyle, aspectRatio: `${previewDim.width} / ${previewDim.height}` }}
             >
               {textLayers.map(layer => {
+                  const xPercent = (layer.x / previewDim.width) * 100;
+                  const yPercent = (layer.y / previewDim.height) * 100;
+
+                  let transform = 'translateY(-50%)';
+                  if (layer.textAlign === 'center') {
+                      transform = 'translateX(-50%) translateY(-50%)';
+                  } else if (layer.textAlign === 'right') {
+                      transform = 'translateX(-100%) translateY(-50%)';
+                  }
+                  
                   const textStyle: React.CSSProperties = {
                     position: 'absolute',
-                    top: `${(layer.y / previewDim.height) * 100}%`,
-                    left: `${(layer.x / previewDim.width) * 100}%`,
-                    transform: `translate(-50%, -50%)`,
+                    top: `${yPercent}%`,
+                    left: `${xPercent}%`,
+                    transform: transform,
                     color: layer.textColor,
                     fontSize: `${layer.fontSize / 32}rem`, // Scale font size for preview
                     fontFamily: layer.fontFamily,

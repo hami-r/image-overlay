@@ -123,20 +123,178 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
         });
 
         drawBackground.then(() => {
+            // Parse margin helper
+            const parseMargin = (marginStr: string | number, dimension: number): number => {
+                if (typeof marginStr === 'number') return marginStr;
+                if (typeof marginStr === 'string' && marginStr.includes('%')) {
+                    const percent = parseFloat(marginStr);
+                    return (dimension * percent) / 100;
+                }
+                return parseFloat(marginStr) || 0;
+            };
+
+            // Group layers by position for stacking
+            const layersByPosition = new Map<string, any[]>();
+            const manualLayers: any[] = [];
+
             textLayers.forEach((layer: any) => {
+                if (layer.x !== undefined && layer.y !== undefined) {
+                    manualLayers.push(layer);
+                } else {
+                    const position = layer.layout?.position || 'center';
+                    if (!layersByPosition.has(position)) {
+                        layersByPosition.set(position, []);
+                    }
+                    layersByPosition.get(position)!.push(layer);
+                }
+            });
+
+            // Process each position group
+            layersByPosition.forEach((layers, position) => {
+                // Calculate total height for this group
+                let totalHeight = 0;
+                const layerHeights: number[] = [];
+                
+                layers.forEach((layer: any) => {
+                    const lines = layer.text.split('\n');
+                    const lineHeight = layer.fontSize * 1.2;
+                    const layerHeight = lines.length * lineHeight;
+                    layerHeights.push(layerHeight);
+                    totalHeight += layerHeight;
+                });
+
+                // Add spacing between layers (half of average font size)
+                if (layers.length > 1) {
+                    const avgFontSize = layers.reduce((sum: number, l: any) => sum + l.fontSize, 0) / layers.length;
+                    totalHeight += (layers.length - 1) * (avgFontSize * 0.8);
+                }
+
+                // Get base margin for this position
+                const firstLayer = layers[0];
+                const margin = parseMargin(firstLayer.layout?.margin || 0, Math.min(width, height));
+
+                // Determine base horizontal position and alignment
+                let baseX: number;
+                let align: CanvasTextAlign = 'left';
+
+                if (position.includes('left')) {
+                    baseX = margin;
+                    align = 'left';
+                } else if (position.includes('right')) {
+                    baseX = width - margin;
+                    align = 'right';
+                } else {
+                    baseX = width / 2;
+                    align = 'center';
+                }
+
+                // Determine base vertical position
+                let baseY: number;
+                if (position.includes('top')) {
+                    baseY = margin;
+                } else if (position.includes('bottom')) {
+                    baseY = height - margin - totalHeight;
+                } else {
+                    baseY = (height - totalHeight) / 2;
+                }
+
+                // Draw each layer in the group
+                let currentY = baseY;
+                layers.forEach((layer: any, index: number) => {
+                    const {
+                        text = "", textColor = '#000000', fontSize = 64, fontFamily = "'Inter', sans-serif",
+                        letterSpacing = 0, addTextShadow = false,
+                        textShadowColor = 'rgba(0,0,0,0.5)', textShadowBlur = 10,
+                        textShadowOffsetX = 5, textShadowOffsetY = 5, textStrokeWidth = 0,
+                        textStrokeColor = '#000000', addTextBackground = false, 
+                        textBackgroundColor = 'rgba(0,0,0,0.5)',
+                        layout = {},
+                    } = layer;
+
+                    ctx.font = `${fontSize}px ${fontFamily}`;
+                    ctx.fillStyle = textColor;
+                    ctx.letterSpacing = `${letterSpacing}px`;
+                    ctx.textBaseline = 'top';
+                    ctx.textAlign = align;
+
+                    if (addTextShadow) {
+                        ctx.shadowColor = textShadowColor; ctx.shadowBlur = textShadowBlur;
+                        ctx.shadowOffsetX = textShadowOffsetX; ctx.shadowOffsetY = textShadowOffsetY;
+                    } else {
+                        ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+                        ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+                    }
+
+                    // Apply custom marginTop offset if specified
+                    let y = currentY;
+                    if (layout.marginTop !== undefined) {
+                        const marginTopValue = parseMargin(layout.marginTop, height);
+                        y = marginTopValue;
+                    }
+
+                    const lines = text.split('\n');
+                    const lineHeight = fontSize * 1.2;
+
+                    // Draw each line
+                    lines.forEach((line: string, lineIndex: number) => {
+                        const currentLineY = y + lineIndex * lineHeight;
+                        
+                        if (addTextBackground) {
+                            const textMetrics = ctx.measureText(line);
+                            const textWidth = textMetrics.width;
+                            const bgPadding = fontSize / 4;
+                            const currentShadow = ctx.shadowColor;
+                            ctx.shadowColor = 'transparent';
+                            ctx.fillStyle = textBackgroundColor;
+
+                            let rectX;
+                            if (align === 'left') {
+                                rectX = baseX - bgPadding;
+                            } else if (align === 'right') {
+                                rectX = baseX - textWidth - bgPadding;
+                            } else {
+                                rectX = baseX - textWidth / 2 - bgPadding;
+                            }
+                            
+                            const rectY = currentLineY - bgPadding / 2;
+                            ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
+                            
+                            ctx.shadowColor = currentShadow;
+                            ctx.fillStyle = textColor;
+                        }
+
+                        if (textStrokeWidth > 0) {
+                            ctx.strokeStyle = textStrokeColor;
+                            ctx.lineWidth = textStrokeWidth;
+                            ctx.strokeText(line, baseX, currentLineY);
+                        }
+                        ctx.fillText(line, baseX, currentLineY);
+                    });
+
+                    // Move to next layer position
+                    currentY += layerHeights[index] + (fontSize * 0.8);
+                });
+            });
+
+            // Draw manual positioned layers
+            manualLayers.forEach((layer: any) => {
                 const {
                     text = "", textColor = '#000000', fontSize = 64, fontFamily = "'Inter', sans-serif",
                     textAlign = 'left', letterSpacing = 0, addTextShadow = false,
                     textShadowColor = 'rgba(0,0,0,0.5)', textShadowBlur = 10,
                     textShadowOffsetX = 5, textShadowOffsetY = 5, textStrokeWidth = 0,
-                    textStrokeColor = '#000000', addTextBackground = false, textBackgroundColor = 'rgba(0,0,0,0.5)',
-                    layout = {},
+                    textStrokeColor = '#000000', addTextBackground = false, 
+                    textBackgroundColor = 'rgba(0,0,0,0.5)',
                 } = layer;
+
+                const x = layer.x;
+                const y = layer.y;
 
                 ctx.font = `${fontSize}px ${fontFamily}`;
                 ctx.fillStyle = textColor;
                 ctx.letterSpacing = `${letterSpacing}px`;
                 ctx.textBaseline = 'top';
+                ctx.textAlign = textAlign as CanvasTextAlign;
 
                 if (addTextShadow) {
                     ctx.shadowColor = textShadowColor; ctx.shadowBlur = textShadowBlur;
@@ -146,61 +304,9 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
                 }
 
-                // Parse margin (can be "8%" or "40" or just a number)
-                const parseMargin = (marginStr: string | number): number => {
-                    if (typeof marginStr === 'number') return marginStr;
-                    if (typeof marginStr === 'string' && marginStr.includes('%')) {
-                        const percent = parseFloat(marginStr);
-                        return (Math.min(width, height) * percent) / 100;
-                    }
-                    return parseFloat(marginStr) || 0;
-                };
-
-                const margin = parseMargin(layout.margin || 0);
-                const position = layout.position || 'center';
-
-                // Calculate position based on layout
-                let x, y;
-                let align: CanvasTextAlign = 'left';
-
-                // Determine horizontal position and alignment
-                if (position.includes('left')) {
-                    x = margin;
-                    align = 'left';
-                } else if (position.includes('right')) {
-                    x = width - margin;
-                    align = 'right';
-                } else {
-                    x = width / 2;
-                    align = 'center';
-                }
-
-                ctx.textAlign = align;
-
-                // Split text into lines
                 const lines = text.split('\n');
                 const lineHeight = fontSize * 1.2;
-                const totalTextHeight = lines.length * lineHeight;
 
-                // Determine vertical position
-                if (position.includes('top')) {
-                    y = margin;
-                } else if (position.includes('bottom')) {
-                    y = height - margin - totalTextHeight;
-                } else {
-                    y = (height - totalTextHeight) / 2;
-                }
-
-                // Handle manual x, y positioning (overrides layout)
-                if (layer.x !== undefined) {
-                    x = layer.x;
-                    ctx.textAlign = textAlign as CanvasTextAlign;
-                }
-                if (layer.y !== undefined) {
-                    y = layer.y;
-                }
-
-                // Draw each line
                 lines.forEach((line: string, lineIndex: number) => {
                     const currentLineY = y + lineIndex * lineHeight;
                     
@@ -213,9 +319,9 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                         ctx.fillStyle = textBackgroundColor;
 
                         let rectX;
-                        if (align === 'left') {
+                        if (textAlign === 'left') {
                             rectX = x - bgPadding;
-                        } else if (align === 'right') {
+                        } else if (textAlign === 'right') {
                             rectX = x - textWidth - bgPadding;
                         } else {
                             rectX = x - textWidth / 2 - bgPadding;
@@ -236,6 +342,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     ctx.fillText(line, x, currentLineY);
                 });
             });
+
             resolve();
         });
     });
@@ -800,5 +907,7 @@ export function ImageEditor() {
 }
 
 
+
+    
 
     

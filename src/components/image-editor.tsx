@@ -247,8 +247,6 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     const hPos = layer.layout.position.split('-')[1] || 'center';
                     let x;
                     const hMargin = width * 0.05;
-                    
-                    ctx.textAlign = hPos as CanvasTextAlign;
 
                     if (hPos === 'left') x = hMargin;
                     else if (hPos === 'right') x = width - hMargin;
@@ -842,5 +840,7 @@ export function ImageEditor() {
     </div>
   );
 }
+
+    
 
     

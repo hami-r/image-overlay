@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -244,14 +245,18 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     const layerHeight = lines.length * (layer.fontSize || 64) * 1.2;
                     const layerCenterY = currentY + layerHeight / 2;
                     
-                    const hPos = layer.layout.position.split('-')[1] || 'center';
+                    const hPos = layer.layout.position.split('-')[1] || layer.layout.position;
                     let x;
                     const hMargin = width * 0.05;
 
-                    if (hPos === 'left') x = hMargin;
-                    else if (hPos === 'right') x = width - hMargin;
-                    else x = width / 2;
-
+                    if (hPos === 'left') {
+                        x = hMargin;
+                    } else if (hPos === 'right') {
+                        x = width - hMargin;
+                    } else { // center
+                        x = width / 2;
+                    }
+                    
                     drawTextLayer(layer, x, layerCenterY);
 
                     currentY += layerHeight;
@@ -840,6 +845,8 @@ export function ImageEditor() {
     </div>
   );
 }
+
+    
 
     
 

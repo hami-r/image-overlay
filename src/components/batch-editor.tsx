@@ -458,35 +458,20 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
         });
 
         drawBackground.then(() => {
-            const autoPositionedLayers = textLayers.filter((l: any) => l.x === undefined || l.y === undefined);
-            const manualPositionedLayers = textLayers.filter((l: any) => l.x !== undefined && l.y !== undefined);
-
-            let totalAutoHeight = 0;
-            autoPositionedLayers.forEach((layer: any) => {
-                const lines = (layer.text || '').split('\n').filter((line: string) => line.trim() !== '');
-                totalAutoHeight += (lines.length * (layer.fontSize * 1.2)) + (layer.fontSize * 0.5);
-            });
-            if (autoPositionedLayers.length > 0) {
-              totalAutoHeight -= (autoPositionedLayers[0]?.fontSize || 0) * 0.5;
-            }
-
-            let currentY = (height - totalAutoHeight) / 2;
-
-            const allLayersToDraw = [...autoPositionedLayers, ...manualPositionedLayers];
-
-            allLayersToDraw.forEach((layer: any) => {
+            textLayers.forEach((layer: any) => {
                 const {
                     text = "", textColor = '#000000', fontSize = 64, fontFamily = "'Inter', sans-serif",
-                    textAlign = 'center', letterSpacing = 0, addTextShadow = false,
+                    textAlign = 'left', letterSpacing = 0, addTextShadow = false,
                     textShadowColor = 'rgba(0,0,0,0.5)', textShadowBlur = 10,
                     textShadowOffsetX = 5, textShadowOffsetY = 5, textStrokeWidth = 0,
                     textStrokeColor = '#000000', addTextBackground = false, textBackgroundColor = 'rgba(0,0,0,0.5)',
+                    layout = {},
                 } = layer;
 
                 ctx.font = `${fontSize}px ${fontFamily}`;
                 ctx.fillStyle = textColor;
                 ctx.letterSpacing = `${letterSpacing}px`;
-                ctx.textBaseline = 'middle';
+                ctx.textBaseline = 'top';
 
                 if (addTextShadow) {
                     ctx.shadowColor = textShadowColor; ctx.shadowBlur = textShadowBlur;
@@ -496,45 +481,63 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
                 }
 
-                const lines = text.split('\n').filter((line: string) => line.trim() !== '');
-                const lineHeight = fontSize * 1.2;
-                const totalLayerHeight = lines.length * lineHeight;
-                
-                let x, y;
-                const isAuto = layer.x === undefined || layer.y === undefined;
-                
-                if (isAuto) {
-                    y = currentY + totalLayerHeight / 2;
-                    currentY += totalLayerHeight + (fontSize * 0.5);
-
-                    // For auto-positioned layers, always use center alignment
-                    // but adjust x position based on desired textAlign
-                    ctx.textAlign = 'center';
-                    
-                    const textMetrics = lines.map((line: string) => ctx.measureText(line));
-                    const maxWidth = Math.max(...textMetrics.map(m => m.width));
-
-                    if (textAlign === 'left') {
-                        // Position the center of the text block at 1/4 width from left
-                        x = maxWidth / 2 + 40; // 40px padding from edge
-                    } else if (textAlign === 'right') {
-                        // Position the center of the text block at 1/4 width from right
-                        x = width - (maxWidth / 2) - 40; // 40px padding from edge
-                    } else {
-                        // Center the text block
-                        x = width / 2;
+                // Parse margin (can be "8%" or "40" or just a number)
+                const parseMargin = (marginStr: string | number): number => {
+                    if (typeof marginStr === 'number') return marginStr;
+                    if (typeof marginStr === 'string' && marginStr.includes('%')) {
+                        const percent = parseFloat(marginStr);
+                        return (Math.min(width, height) * percent) / 100;
                     }
+                    return parseFloat(marginStr) || 0;
+                };
+
+                const margin = parseMargin(layout.margin || 0);
+                const position = layout.position || 'center';
+
+                // Calculate position based on layout
+                let x, y;
+                let align: CanvasTextAlign = 'left';
+
+                // Determine horizontal position and alignment
+                if (position.includes('left')) {
+                    x = margin;
+                    align = 'left';
+                } else if (position.includes('right')) {
+                    x = width - margin;
+                    align = 'right';
                 } else {
-                    // Manual positioning respects the textAlign setting
-                    ctx.textAlign = textAlign as CanvasTextAlign;
-                    x = layer.x!;
-                    y = layer.y!;
+                    x = width / 2;
+                    align = 'center';
                 }
 
-                let startY = y - totalLayerHeight / 2;
-                
+                ctx.textAlign = align;
+
+                // Split text into lines
+                const lines = text.split('\n');
+                const lineHeight = fontSize * 1.2;
+                const totalTextHeight = lines.length * lineHeight;
+
+                // Determine vertical position
+                if (position.includes('top')) {
+                    y = margin;
+                } else if (position.includes('bottom')) {
+                    y = height - margin - totalTextHeight;
+                } else {
+                    y = (height - totalTextHeight) / 2;
+                }
+
+                // Handle manual x, y positioning (overrides layout)
+                if (layer.x !== undefined) {
+                    x = layer.x;
+                    ctx.textAlign = textAlign as CanvasTextAlign;
+                }
+                if (layer.y !== undefined) {
+                    y = layer.y;
+                }
+
+                // Draw each line
                 lines.forEach((line: string, lineIndex: number) => {
-                    const currentLineY = startY + lineIndex * lineHeight + lineHeight / 2;
+                    const currentLineY = y + lineIndex * lineHeight;
                     
                     if (addTextBackground) {
                         const textMetrics = ctx.measureText(line);
@@ -545,16 +548,15 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                         ctx.fillStyle = textBackgroundColor;
 
                         let rectX;
-                        const currentAlign = isAuto ? 'center' : textAlign;
-                        if (currentAlign === 'left') {
+                        if (align === 'left') {
                             rectX = x - bgPadding;
-                        } else if (currentAlign === 'right') {
+                        } else if (align === 'right') {
                             rectX = x - textWidth - bgPadding;
                         } else {
                             rectX = x - textWidth / 2 - bgPadding;
                         }
                         
-                        const rectY = currentLineY - (lineHeight/2) - bgPadding/2;
+                        const rectY = currentLineY - bgPadding / 2;
                         ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
                         
                         ctx.shadowColor = currentShadow;
@@ -1380,3 +1382,5 @@ export function BatchEditor() {
         </div>
     );
 }
+
+    

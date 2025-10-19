@@ -458,7 +458,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
             const getWrappedLines = (layer: any) => {
                 const { text = "", fontSize = 64, fontFamily = "'Inter', sans-serif" } = layer;
                 ctx.font = `${fontSize}px ${fontFamily}`;
-                const maxWidth = width - (width * 0.1); // 5% margin on each side
+                const maxWidth = width - (width * 0.2); // 10% margin on each side
                 
                 const manualLines = text.split('\n');
                 let wrappedLines: string[] = [];
@@ -568,7 +568,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                 }, 0);
 
                 let regionY;
-                const margin = height * 0.05;
+                const margin = height * 0.1;
                 if (vGroupKey === 'top') regionY = margin;
                 else if (vGroupKey === 'bottom') regionY = height - margin - totalGroupHeight;
                 else regionY = (height - totalGroupHeight) / 2;
@@ -580,17 +580,19 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     const layerHeight = lines.length * (layer.fontSize || 64) * 1.2;
                     const layerCenterY = currentY + layerHeight / 2;
                     
-                    const hPos = layer.layout.position.split('-')[1] || (layer.layout.position === 'center' ? 'center' : layer.textAlign) || 'center';
+                    const hPos = layer.layout.position.split('-')[1] || (layer.layout.position === 'center' ? 'center' : 'center');
 
                     let x;
-                    const hMargin = width * 0.05;
-                    ctx.textAlign = layer.textAlign || 'center';
-
+                    const hMargin = width * 0.1;
+                    
                     if (hPos === 'left') {
+                        ctx.textAlign = 'left';
                         x = hMargin;
                     } else if (hPos === 'right') {
+                        ctx.textAlign = 'right';
                         x = width - hMargin;
                     } else { // center
+                        ctx.textAlign = 'center';
                         x = width / 2;
                     }
                     
@@ -1431,3 +1433,4 @@ export function BatchEditor() {
         </div>
     );
 }
+

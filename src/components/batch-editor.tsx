@@ -580,9 +580,11 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     const layerHeight = lines.length * (layer.fontSize || 64) * 1.2;
                     const layerCenterY = currentY + layerHeight / 2;
                     
-                    const hPos = layer.layout.position.split('-')[1] || layer.layout.position;
+                    const hPos = layer.layout.position.split('-')[1] || (layer.layout.position === 'center' ? 'center' : layer.textAlign) || 'center';
+
                     let x;
                     const hMargin = width * 0.05;
+                    ctx.textAlign = layer.textAlign || 'center';
 
                     if (hPos === 'left') {
                         x = hMargin;
@@ -1429,9 +1431,3 @@ export function BatchEditor() {
         </div>
     );
 }
-
-    
-
-    
-
-    

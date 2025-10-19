@@ -119,51 +119,8 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
         });
 
         drawBackground.then(() => {
-            const autoPositionedLayers = textLayers.filter((l: any) => !l.layout?.position);
-            const manualPositionedLayers = textLayers.filter((l: any) => l.x !== undefined && l.y !== undefined && !l.layout?.position);
-            const smartPositionedLayers = textLayers.filter((l: any) => l.layout?.position);
-
-            let autoY = 0;
-            const autoLayerHeights: { [id: number]: number } = {};
+            const layersToDraw = [...textLayers];
             
-            // Pass 1: Calculate heights for auto-positioned layers
-            autoPositionedLayers.forEach((layer: any) => {
-                const { text = "", fontSize = 64, fontFamily = "'Inter', sans-serif" } = layer;
-                ctx.font = `${fontSize}px ${fontFamily}`;
-                const lineHeight = fontSize * 1.2;
-                const maxWidth = width - (width * 0.1);
-
-                const manualLines = text.split('\n');
-                let wrappedLines: string[] = [];
-                manualLines.forEach(line => {
-                    let currentLine = '';
-                    const words = line.split(' ');
-                    for (const word of words) {
-                        const testLine = currentLine + word + ' ';
-                        if (ctx.measureText(testLine).width > maxWidth && currentLine.length > 0) {
-                            wrappedLines.push(currentLine.trim());
-                            currentLine = word + ' ';
-                        } else {
-                            currentLine = testLine;
-                        }
-                    }
-                    wrappedLines.push(currentLine.trim());
-                });
-                
-                const totalLayerHeight = wrappedLines.length * lineHeight;
-                autoLayerHeights[layer.id] = totalLayerHeight;
-                autoY += totalLayerHeight + (fontSize * 0.5); // Padding
-            });
-
-            if (Object.keys(autoLayerHeights).length > 0) {
-                const firstLayerId = Object.keys(autoLayerHeights)[0];
-                const firstLayer = textLayers.find((l:any) => l.id === parseInt(firstLayerId));
-                autoY -= (firstLayer?.fontSize || 0) * 0.5; // No padding before first item
-            }
-            
-            let currentY = (height - autoY) / 2;
-            const layersToDraw = [...autoPositionedLayers, ...manualPositionedLayers, ...smartPositionedLayers];
-
             layersToDraw.forEach((layer: any) => {
                 const {
                     text = "", textColor = '#000000', fontSize = 64, fontFamily = "'Inter', sans-serif",
@@ -188,6 +145,9 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                 }
                 
                 const lineHeight = fontSize * 1.2;
+                let autoX = width / 2;
+                const marginX = width * 0.1;
+                autoX = textAlign === 'left' ? marginX : (textAlign === 'right' ? width - marginX : width / 2);
                 const maxWidth = width - (width * 0.1);
 
                 const manualLines = text.split('\n');
@@ -210,55 +170,81 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                 const totalLayerHeight = wrappedLines.length * lineHeight;
                 
                 let x, y;
+                const autoPositionedLayers = textLayers.filter((l: any) => !l.layout && (l.x === undefined || l.y === undefined));
+                
                 if (layer.layout?.position) {
                     const margin = width * 0.05; // 5% margin
                     const [yPos, xPos] = layer.layout.position.split('-');
                     
-                    // Y position
                     if (yPos === 'top') y = margin + totalLayerHeight / 2;
                     else if (yPos === 'bottom') y = height - margin - totalLayerHeight / 2;
                     else y = height / 2;
 
-                    // X position
                     if (xPos === 'left') x = margin;
                     else if (xPos === 'right') x = width - margin;
                     else x = width / 2;
-
+                    
                     ctx.textAlign = xPos as CanvasTextAlign;
 
                 } else if (layer.x !== undefined && layer.y !== undefined) {
                     x = layer.x;
                     y = layer.y;
-                } else { // Auto-stacking logic for layers without any position info
-                    x = width / 2;
-                    y = currentY + (autoLayerHeights[layer.id] / 2);
-                    currentY += autoLayerHeights[layer.id] + (fontSize * 0.5);
+                } else { // Auto-stacking for layers without any position info
+                    const totalAutoHeight = autoPositionedLayers.reduce((acc, l) => {
+                        ctx.font = `${l.fontSize || 64}px ${l.fontFamily || "'Inter', sans-serif"}`;
+                        const lines = l.text.split('\n').length;
+                        return acc + (lines * (l.fontSize || 64) * 1.2);
+                    }, 0);
+                    
+                    let yOffset = (height - totalAutoHeight) / 2;
+
+                    for (const l of autoPositionedLayers) {
+                        ctx.font = `${l.fontSize || 64}px ${l.fontFamily || "'Inter', sans-serif"}`;
+                        const l_lines = l.text.split('\n').length;
+                        const l_layerHeight = (l_lines * (l.fontSize || 64) * 1.2);
+                        if (l.id === layer.id) {
+                            y = yOffset + l_layerHeight / 2;
+                            break;
+                        }
+                        yOffset += l_layerHeight;
+                    }
+                    x = autoX;
+                }
+                
+                if (y === undefined) {
+                    // Fallback for layers that might have been missed (e.g. only x is defined)
+                    y = height / 2;
                 }
                 
                 let startY = y - (totalLayerHeight / 2);
                 
-                wrappedLines.forEach((line: string, lineIndex: number) => {
-                    const currentLineY = startY + (lineIndex * lineHeight) + (lineHeight / 2);
+                wrappedLines.forEach((line: string) => {
+                    const currentLineY = startY + (lineHeight / 2);
+                    let lineX = x;
+
+                     if (textAlign === 'left') {
+                        lineX = (layer.layout?.position?.includes('left')) ? x : (width - maxWidth) / 2;
+                    } else if (textAlign === 'right') {
+                         lineX = (layer.layout?.position?.includes('right')) ? x : width - (width - maxWidth) / 2;
+                    }
                     
                     if (addTextBackground) {
                         const textMetrics = ctx.measureText(line);
                         const bgPadding = fontSize / 4;
                         let textWidth = textMetrics.width;
 
-                        // Save and reset shadow for background drawing
                         const currentShadow = { c: ctx.shadowColor, b: ctx.shadowBlur, x: ctx.shadowOffsetX, y: ctx.shadowOffsetY };
                         ctx.shadowColor = 'transparent';
                         ctx.fillStyle = textBackgroundColor;
 
                         let rectX;
-                        if (ctx.textAlign === 'left') rectX = x - bgPadding;
-                        else if (ctx.textAlign === 'right') rectX = x - textWidth - bgPadding;
-                        else rectX = x - textWidth / 2 - bgPadding;
+                        if (ctx.textAlign === 'left') rectX = lineX - bgPadding;
+                        else if (ctx.textAlign === 'right') rectX = lineX - textWidth - bgPadding;
+                        else rectX = lineX - textWidth / 2 - bgPadding;
                         
                         const rectY = currentLineY - (lineHeight/2) - bgPadding/2;
                         ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
                         
-                        // Restore shadow and text color
                         ctx.shadowColor = currentShadow.c; ctx.shadowBlur = currentShadow.b; ctx.shadowOffsetX = currentShadow.x; ctx.shadowOffsetY = currentShadow.y;
                         ctx.fillStyle = textColor;
                     }
@@ -266,9 +252,10 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     if (textStrokeWidth > 0) {
                         ctx.strokeStyle = textStrokeColor;
                         ctx.lineWidth = textStrokeWidth;
-                        ctx.strokeText(line, x, currentLineY);
+                        ctx.strokeText(line, lineX, currentLineY);
                     }
-                    ctx.fillText(line, x, currentLineY);
+                    ctx.fillText(line, lineX, currentLineY);
+                    startY += lineHeight;
                 });
             });
             resolve();

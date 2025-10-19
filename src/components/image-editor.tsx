@@ -120,10 +120,10 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
         });
 
         drawBackground.then(() => {
+            const hMargin = width * 0.15;
             const getWrappedLines = (layer: any) => {
                 const { text = "", fontSize = 64, fontFamily = "'Inter', sans-serif" } = layer;
                 ctx.font = `${fontSize}px ${fontFamily}`;
-                const hMargin = width * 0.15;
                 const maxWidth = width - (hMargin * 2);
                 
                 const manualLines = text.split('\n');
@@ -249,7 +249,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     const hPos = layer.layout.position.split('-')[1] || (layer.layout.position === 'center' ? 'center' : 'center');
 
                     let x;
-                    const hMargin = width * 0.15;
+                    ctx.textAlign = hPos as CanvasTextAlign;
                     
                     if (hPos === 'left') {
                         x = hMargin;
@@ -259,7 +259,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                         x = width / 2;
                     }
                     
-                    drawTextLayer({...layer, textAlign: hPos}, x, layerCenterY);
+                    drawTextLayer(layer, x, layerCenterY);
 
                     currentY += layerHeight;
                 });
@@ -847,4 +847,3 @@ export function ImageEditor() {
     </div>
   );
 }
-

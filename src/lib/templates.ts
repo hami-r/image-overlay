@@ -1,4 +1,5 @@
 
+
 export const imageTemplates = [
   {
     name: 'News Headline',
@@ -10,22 +11,18 @@ export const imageTemplates = [
             "textColor": "#FFFFFF",
             "fontSize": 128,
             "fontFamily": "'Playfair Display', serif",
-            "textAlign": "center",
             "addTextBackground": true,
             "textBackgroundColor": "rgba(204, 0, 0, 0.8)",
-            "x": 640,
-            "y": 360
+            "layout": { "position": "center" }
           },
           {
             "text": "A Major Event Has Just Occurred",
             "textColor": "#FFFFFF",
             "fontSize": 48,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "center",
             "addTextBackground": true,
             "textBackgroundColor": "rgba(0, 0, 0, 0.7)",
-            "x": 640,
-            "y": 500
+            "layout": { "position": "center-bottom" }
           }
         ],
         "width": 1280,
@@ -44,18 +41,14 @@ export const imageTemplates = [
             "textColor": "#1a1a1a",
             "fontSize": 96,
             "fontFamily": "'Playfair Display', serif",
-            "textAlign": "center",
-            "x": 540,
-            "y": 480
+            "layout": { "position": "center" }
           },
           {
             "text": "- Abraham Lincoln",
             "textColor": "#555555",
             "fontSize": 48,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "right",
-            "x": 900,
-            "y": 700
+            "layout": { "position": "bottom-right", "margin": "10%" }
           }
         ],
         "background": "linear-gradient(to bottom right, #ece9e6, #ffffff)",
@@ -109,31 +102,25 @@ export const imageTemplates = [
             "textColor": "#FFFFFF",
             "fontSize": 48,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "left",
-            "x": 100,
-            "y": 150
+            "layout": { "position": "top-left", "margin": "10%" }
           },
           {
             "text": "Hyperion X1",
             "textColor": "#FFFFFF",
             "fontSize": 128,
             "fontFamily": "'Playfair Display', serif",
-            "textAlign": "left",
             "textStrokeWidth": 2,
             "textStrokeColor": "#000000",
             "letterSpacing": -5,
-            "x": 100,
-            "y": 260
+            "layout": { "position": "center-left", "margin": "10%" }
           },
            {
             "text": "• Faster Than Ever\n• Sleek New Design\n• 48-Hour Battery",
             "textColor": "#FFFFFF",
             "fontSize": 36,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "left",
             "addTextShadow": true,
-            "x": 100,
-            "y": 450
+            "layout": { "position": "bottom-left", "margin": "10%" }
           }
         ],
         "backgroundImage": "https://images.unsplash.com/photo-1526726538690-5c690f73c457?q=80&w=2070",
@@ -152,22 +139,18 @@ export const imageTemplates = [
             "textColor": "#FFFFFF",
             "fontSize": 64,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "center",
             "addTextBackground": true,
             "textBackgroundColor": "#CC0000",
-            "x": 220,
-            "y": 650
+            "layout": { "position": "bottom-left", "margin": "5%"}
           },
           {
             "text": "This is a sample news headline scrolling across the screen",
             "textColor": "#000000",
             "fontSize": 52,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "left",
             "addTextBackground": true,
             "textBackgroundColor": "rgba(255, 255, 255, 0.9)",
-            "x": 450,
-            "y": 650
+            "layout": { "position": "bottom-right", "margin": "5%"}
           }
         ],
         "width": 1920,
@@ -186,18 +169,14 @@ export const imageTemplates = [
             "textColor": "#333333",
             "fontSize": 96,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "left",
-            "x": 100,
-            "y": 320
+            "layout": {"position": "center-left", "margin": "10%"}
           },
           {
             "text": "And a short, descriptive subtitle",
             "textColor": "#777777",
             "fontSize": 36,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "left",
-            "x": 100,
-            "y": 420
+            "layout": {"position": "center-left", "margin": "10%", "marginTop": "25%"}
           }
         ],
         "width": 1280,
@@ -216,21 +195,19 @@ export const imageTemplates = [
             "textColor": "#FFFFFF",
             "fontSize": 200,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "center",
             "textStrokeWidth": 8,
             "textStrokeColor": "#000000",
             "letterSpacing": 10,
-            "y": 400
+            "layout": { "position": "center"}
           },
           {
             "text": "FLASH SALE",
             "textColor": "#000000",
             "fontSize": 80,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "center",
             "addTextBackground": true,
             "textBackgroundColor": "#FFFF00",
-            "y": 650
+            "layout": { "position": "bottom-center", "margin": "10%" }
           }
         ],
         "width": 1080,
@@ -254,7 +231,8 @@ export const imageTemplates = [
             "textShadowColor": "#00FFFF",
             "textShadowBlur": 20,
             "textShadowOffsetX": 0,
-            "textShadowOffsetY": 0
+            "textShadowOffsetY": 0,
+            "layout": { "position": "center" }
           }
         ],
         "width": 1920,
@@ -273,24 +251,22 @@ export const imageTemplates = [
             "textColor": "#BBBBBB",
             "fontSize": 32,
             "fontFamily": "'Roboto Mono', monospace",
-            "textAlign": "center",
-            "y": 150
+            "layout": { "position": "top-center", "margin": "10%" }
           },
           {
             "text": "THE DIGITAL FRONTIER",
             "textColor": "#FFFFFF",
             "fontSize": 96,
             "fontFamily": "'Playfair Display', serif",
-            "textAlign": "center",
-            "addTextShadow": true
+            "addTextShadow": true,
+             "layout": { "position": "center" }
           },
           {
             "text": "with Hostname",
             "textColor": "#DDDDDD",
             "fontSize": 40,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "center",
-            "y": 900
+            "layout": { "position": "bottom-center", "margin": "10%" }
           }
         ],
         "width": 1080,
@@ -309,29 +285,23 @@ export const imageTemplates = [
             "textColor": "#FFFFFF",
             "fontSize": 80,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "left",
             "addTextBackground": true,
             "textBackgroundColor": "#3498db",
-            "x": 100,
-            "y": 150
+            "layout": {"position": "top-left", "margin": "8%"}
           },
           {
             "text": "Configure Your Environment",
             "textColor": "#333333",
             "fontSize": 72,
             "fontFamily": "'Playfair Display', serif",
-            "textAlign": "left",
-            "x": 100,
-            "y": 360
+            "layout": {"position": "center-left", "margin": "8%"}
           },
           {
             "text": "Make sure you have all the necessary tools and software installed before proceeding to the next step. This is a crucial part of the process.",
             "textColor": "#555555",
             "fontSize": 32,
             "fontFamily": "'Inter', sans-serif",
-            "textAlign": "left",
-            "x": 100,
-            "y": 500
+            "layout": {"position": "bottom-left", "margin": "8%"}
           }
         ],
         "width": 1280,
@@ -342,4 +312,41 @@ export const imageTemplates = [
   }
 ];
 
-    
+export interface CustomTemplate {
+  name: string;
+  json: string;
+}
+
+const CUSTOM_TEMPLATES_KEY = 'image-overlay-custom-templates';
+
+export function getCustomTemplates(): CustomTemplate[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+  try {
+    const saved = window.localStorage.getItem(CUSTOM_TEMPLATES_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    console.error("Failed to load custom templates from localStorage", e);
+    return [];
+  }
+}
+
+export function saveCustomTemplate(template: CustomTemplate) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const templates = getCustomTemplates();
+  // Avoid duplicates by name
+  const existingIndex = templates.findIndex(t => t.name === template.name);
+  if (existingIndex > -1) {
+    templates[existingIndex] = template;
+  } else {
+    templates.push(template);
+  }
+  try {
+    window.localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(templates));
+  } catch (e) {
+    console.error("Failed to save custom template to localStorage", e);
+  }
+}

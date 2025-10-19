@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Code, Bot, AlertTriangle, Sparkles, Trash2, PlusCircle, FormInput, Shuffle, Upload, Link, Copy, CheckSquare } from 'lucide-react';
+import { Code, Bot, AlertTriangle, Sparkles, Trash2, PlusCircle, FormInput, Shuffle, Upload, Link, Copy, CheckSquare, Save } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,6 +29,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   AlertDialog,
@@ -40,7 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { imageTemplates } from '@/lib/templates';
+import { imageTemplates, getCustomTemplates, saveCustomTemplate, type CustomTemplate } from '@/lib/templates';
 import { cn } from '@/lib/utils';
 
 const AIBackgroundGenerator = ({ index, onGenerate, isGenerating }: { index: number, onGenerate: (prompt: string) => void, isGenerating: boolean }) => {
@@ -454,51 +455,8 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
         });
 
         drawBackground.then(() => {
-            const autoPositionedLayers = textLayers.filter((l: any) => !l.layout?.position);
-            const manualPositionedLayers = textLayers.filter((l: any) => l.x !== undefined && l.y !== undefined && !l.layout?.position);
-            const smartPositionedLayers = textLayers.filter((l: any) => l.layout?.position);
-
-            let autoY = 0;
-            const autoLayerHeights: { [id: number]: number } = {};
+            const layersToDraw = [...textLayers];
             
-            // Pass 1: Calculate heights for auto-positioned layers
-            autoPositionedLayers.forEach((layer: any) => {
-                const { text = "", fontSize = 64, fontFamily = "'Inter', sans-serif" } = layer;
-                ctx.font = `${fontSize}px ${fontFamily}`;
-                const lineHeight = fontSize * 1.2;
-                const maxWidth = width - (width * 0.1);
-
-                const manualLines = text.split('\n');
-                let wrappedLines: string[] = [];
-                manualLines.forEach(line => {
-                    let currentLine = '';
-                    const words = line.split(' ');
-                    for (const word of words) {
-                        const testLine = currentLine + word + ' ';
-                        if (ctx.measureText(testLine).width > maxWidth && currentLine.length > 0) {
-                            wrappedLines.push(currentLine.trim());
-                            currentLine = word + ' ';
-                        } else {
-                            currentLine = testLine;
-                        }
-                    }
-                    wrappedLines.push(currentLine.trim());
-                });
-                
-                const totalLayerHeight = wrappedLines.length * lineHeight;
-                autoLayerHeights[layer.id] = totalLayerHeight;
-                autoY += totalLayerHeight + (fontSize * 0.5); // Padding
-            });
-
-            if (Object.keys(autoLayerHeights).length > 0) {
-                const firstLayerId = Object.keys(autoLayerHeights)[0];
-                const firstLayer = textLayers.find((l:any) => l.id === parseInt(firstLayerId));
-                autoY -= (firstLayer?.fontSize || 0) * 0.5; // No padding before first item
-            }
-            
-            let currentY = (height - autoY) / 2;
-            const layersToDraw = [...autoPositionedLayers, ...manualPositionedLayers, ...smartPositionedLayers];
-
             layersToDraw.forEach((layer: any) => {
                 const {
                     text = "", textColor = '#000000', fontSize = 64, fontFamily = "'Inter', sans-serif",
@@ -523,6 +481,12 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                 }
                 
                 const lineHeight = fontSize * 1.2;
+                let autoX = width / 2;
+                let autoY = height / 2;
+                if (layer.x === undefined && layer.y === undefined) {
+                    const marginX = width * 0.1;
+                    autoX = textAlign === 'left' ? marginX : (textAlign === 'right' ? width - marginX : width / 2);
+                }
                 const maxWidth = width - (width * 0.1);
 
                 const manualLines = text.split('\n');
@@ -545,55 +509,80 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                 const totalLayerHeight = wrappedLines.length * lineHeight;
                 
                 let x, y;
-                if (layer.layout?.position) {
+                 if (layer.layout?.position) {
                     const margin = width * 0.05; // 5% margin
                     const [yPos, xPos] = layer.layout.position.split('-');
                     
-                    // Y position
                     if (yPos === 'top') y = margin + totalLayerHeight / 2;
                     else if (yPos === 'bottom') y = height - margin - totalLayerHeight / 2;
                     else y = height / 2;
 
-                    // X position
                     if (xPos === 'left') x = margin;
                     else if (xPos === 'right') x = width - margin;
                     else x = width / 2;
-
-                    ctx.textAlign = xPos as CanvasTextAlign;
+                    
+                    if (textAlign !== xPos) ctx.textAlign = xPos as CanvasTextAlign;
 
                 } else if (layer.x !== undefined && layer.y !== undefined) {
                     x = layer.x;
                     y = layer.y;
-                } else { // Auto-stacking logic for layers without any position info
-                    x = width / 2;
-                    y = currentY + (autoLayerHeights[layer.id] / 2);
-                    currentY += autoLayerHeights[layer.id] + (fontSize * 0.5);
+                } else { // Auto-stacking for layers without any position info
+                    const otherLayersHeight = layersToDraw.filter(l => l.id !== layer.id).reduce((acc, l) => {
+                        ctx.font = `${l.fontSize || 64}px ${l.fontFamily || "'Inter', sans-serif"}`;
+                        const lines = l.text.split('\n').length;
+                        return acc + (lines * (l.fontSize || 64) * 1.2);
+                    }, 0);
+                    
+                    const totalHeight = layersToDraw.reduce((acc, l) => {
+                         ctx.font = `${l.fontSize || 64}px ${l.fontFamily || "'Inter', sans-serif"}`;
+                        const lines = l.text.split('\n').length;
+                        return acc + (lines * (l.fontSize || 64) * 1.2);
+                    }, 0);
+                    
+                    let yOffset = (height - totalHeight) / 2;
+
+                    for (const l of layersToDraw) {
+                        ctx.font = `${l.fontSize || 64}px ${l.fontFamily || "'Inter', sans-serif"}`;
+                        const lines = l.text.split('\n').length;
+                        const layerHeight = (lines * (l.fontSize || 64) * 1.2);
+                        if (l.id === layer.id) {
+                            y = yOffset + layerHeight / 2;
+                            break;
+                        }
+                        yOffset += layerHeight;
+                    }
+                    x = autoX;
                 }
                 
                 let startY = y - (totalLayerHeight / 2);
                 
                 wrappedLines.forEach((line: string, lineIndex: number) => {
                     const currentLineY = startY + (lineIndex * lineHeight) + (lineHeight / 2);
+                    let lineX = x;
+
+                    if (textAlign === 'left') {
+                        lineX = (layer.layout?.position?.includes('left')) ? x : (width - maxWidth) / 2;
+                    } else if (textAlign === 'right') {
+                         lineX = (layer.layout?.position?.includes('right')) ? x : width - (width - maxWidth) / 2;
+                    }
                     
                     if (addTextBackground) {
                         const textMetrics = ctx.measureText(line);
                         const bgPadding = fontSize / 4;
                         let textWidth = textMetrics.width;
 
-                        // Save and reset shadow for background drawing
                         const currentShadow = { c: ctx.shadowColor, b: ctx.shadowBlur, x: ctx.shadowOffsetX, y: ctx.shadowOffsetY };
                         ctx.shadowColor = 'transparent';
                         ctx.fillStyle = textBackgroundColor;
 
                         let rectX;
-                        if (ctx.textAlign === 'left') rectX = x - bgPadding;
-                        else if (ctx.textAlign === 'right') rectX = x - textWidth - bgPadding;
-                        else rectX = x - textWidth / 2 - bgPadding;
+                        if (ctx.textAlign === 'left') rectX = lineX - bgPadding;
+                        else if (ctx.textAlign === 'right') rectX = lineX - textWidth - bgPadding;
+                        else rectX = lineX - textWidth / 2 - bgPadding;
                         
                         const rectY = currentLineY - (lineHeight/2) - bgPadding/2;
                         ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
                         
-                        // Restore shadow and text color
                         ctx.shadowColor = currentShadow.c; ctx.shadowBlur = currentShadow.b; ctx.shadowOffsetX = currentShadow.x; ctx.shadowOffsetY = currentShadow.y;
                         ctx.fillStyle = textColor;
                     }
@@ -601,9 +590,9 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     if (textStrokeWidth > 0) {
                         ctx.strokeStyle = textStrokeColor;
                         ctx.lineWidth = textStrokeWidth;
-                        ctx.strokeText(line, x, currentLineY);
+                        ctx.strokeText(line, lineX, currentLineY);
                     }
-                    ctx.fillText(line, x, currentLineY);
+                    ctx.fillText(line, lineX, currentLineY);
                 });
             });
             resolve();
@@ -663,9 +652,17 @@ export function BatchEditor() {
     // State for Template Dialog
     const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
     const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+    const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
+
+    const [saveTemplateDialogOpen, setSaveTemplateDialogOpen] = useState(false);
+    const [newTemplateName, setNewTemplateName] = useState("");
 
 
     const { toast } = useToast();
+
+    useEffect(() => {
+        setCustomTemplates(getCustomTemplates());
+    }, []);
 
     useEffect(() => {
         try {
@@ -674,29 +671,27 @@ export function BatchEditor() {
                 setConfigs(parsed.map(c => ({...c, textLayers: c.textLayers && c.textLayers.length > 0 ? c.textLayers.map((l: any, i: number) => ({...l, id: l.id || Date.now() + i})) : [{ text: c.text || "Missing Text", id: Date.now() }]})));
                 setJsonError(null);
             } else {
-                setJsonError("Input must be a JSON array.");
+                setJsonError("Invalid JSON: Input must be an array of objects.");
                 setConfigs([]);
             }
         } catch (error: any) {
-            setJsonError("Invalid JSON. " + error.message);
-            // Don't clear configs on temporary syntax error
+            setJsonError("Invalid JSON: " + error.message);
         }
     }, [jsonInput]);
 
     useEffect(() => {
-        // Sync configs back to JSON input if there's no error
         if (!jsonError) {
              const newJson = JSON.stringify(configs, (key, value) => {
                 if (key === 'id') return undefined;
-                if (value === undefined) return undefined; // Omit undefined values
+                if (value === undefined) return undefined;
                 if (key === 'layout' && value && Object.keys(value).length === 0) return undefined;
                 return value;
              }, 2);
              if (newJson !== jsonInput) {
-                 // To prevent infinite loops, only update if the stringified version is different
-                 // and the parsed versions are also different (deep check is too slow)
                  try {
-                    if (JSON.stringify(JSON.parse(jsonInput), (key, value) => key === 'id' ? undefined : value, 2) !== newJson) {
+                    const parsedInput = JSON.parse(jsonInput);
+                    const cleanParsedInput = JSON.parse(JSON.stringify(parsedInput, (key, value) => key === 'id' ? undefined : value));
+                    if (JSON.stringify(cleanParsedInput, null, 2) !== JSON.stringify(configs, (key, value) => key === 'id' ? undefined : value, 2)) {
                        setJsonInput(newJson);
                     }
                  } catch (e) {
@@ -730,7 +725,6 @@ export function BatchEditor() {
 
         for (let i = 0; i < configs.length; i++) {
             try {
-                // Add a small delay between downloads to prevent browser blocking
                 await new Promise(resolve => setTimeout(resolve, 300));
                 await generateAndDownload(configs[i], i + 1);
                 toast({
@@ -763,7 +757,6 @@ export function BatchEditor() {
         setIsGeneratingJson(true);
         try {
             const result = await generateBatchJson({ prompt: aiPrompt });
-            // Attempt to parse to ensure it's valid before setting
             const parsedJson = JSON.parse(result.json);
             setJsonInput(JSON.stringify(parsedJson, null, 2));
             setConfigs(parsedJson);
@@ -820,7 +813,7 @@ export function BatchEditor() {
                             newLayer[field] = value === '' ? undefined : Number(value);
                         } else if (["x", "y"].includes(field)) {
                             newLayer[field] = value === '' ? undefined : Number(value);
-                        } else if (field === 'textLayers') { // Whole array replacement
+                        } else if (field === 'textLayers') {
                             return value;
                         }
                         else {
@@ -1002,7 +995,6 @@ export function BatchEditor() {
                 const newConfig = { ...config };
                 if (newConfig.textLayers && newConfig.textLayers.length > 0) {
                     newConfig.textLayers = newConfig.textLayers.map((layer:any, index: number) => {
-                        // Only apply to first layer for some properties if desired
                         if (index === 0) {
                             return { ...layer, [field]: value };
                         }
@@ -1081,7 +1073,6 @@ export function BatchEditor() {
     const handleAddFromTemplates = () => {
         const newConfigs = selectedTemplates.map(templateJson => {
             const template = JSON.parse(templateJson)[0];
-            // Ensure new IDs are generated for text layers
             template.textLayers = template.textLayers.map((l: any) => ({ ...l, id: Date.now() + Math.random() }));
             return template;
         });
@@ -1093,6 +1084,36 @@ export function BatchEditor() {
         });
         setTemplateDialogOpen(false);
         setSelectedTemplates([]);
+    };
+
+    const handleSaveTemplate = () => {
+        if (!newTemplateName.trim()) {
+            toast({ variant: 'destructive', title: 'Template name is required.' });
+            return;
+        }
+        try {
+            const parsed = JSON.parse(jsonInput);
+            if (!Array.isArray(parsed) || parsed.length === 0) {
+                toast({ variant: 'destructive', title: 'Invalid Template', description: 'JSON must be an array with at least one image config.' });
+                return;
+            }
+            
+            // We only save the first image from the batch as a template
+            const templateJson = JSON.stringify([parsed[0]], null, 2);
+            
+            const newTemplate: CustomTemplate = {
+                name: newTemplateName,
+                json: templateJson,
+            };
+            saveCustomTemplate(newTemplate);
+            setCustomTemplates(getCustomTemplates());
+            setSaveTemplateDialogOpen(false);
+            setNewTemplateName("");
+            toast({ title: `Template "${newTemplateName}" saved!` });
+
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'Invalid JSON', description: 'Cannot save an invalid JSON configuration as a template.' });
+        }
     };
 
 
@@ -1263,7 +1284,37 @@ export function BatchEditor() {
                             className="font-mono text-sm bg-background"
                             disabled={isGenerating || isGeneratingJson}
                         />
-                        <Code className="absolute top-3 right-3 text-muted-foreground" />
+                        <div className="absolute top-3 right-3 flex gap-2">
+                             <Dialog open={saveTemplateDialogOpen} onOpenChange={setSaveTemplateDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" disabled={!!jsonError}>
+                                        <Save className="h-4 w-4" />
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Save as Template</DialogTitle>
+                                        <DialogDescription>
+                                            Save the current JSON for the first image as a reusable template.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="template-name">Template Name</Label>
+                                        <Input 
+                                            id="template-name" 
+                                            value={newTemplateName} 
+                                            onChange={(e) => setNewTemplateName(e.target.value)} 
+                                            placeholder="e.g., YouTube Thumbnail"
+                                        />
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="outline" onClick={() => setSaveTemplateDialogOpen(false)}>Cancel</Button>
+                                        <Button onClick={handleSaveTemplate}>Save Template</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                            <Code className="text-muted-foreground self-center" />
+                        </div>
                     </div>
                      {jsonError && (
                         <Alert variant="destructive" className="mt-4">
@@ -1319,11 +1370,11 @@ export function BatchEditor() {
                     <DialogHeader>
                         <DialogTitle>Add Images from Templates</DialogTitle>
                         <DialogDescription>
-                            Select one or more templates to add to your batch.
+                            Select one or more templates to add to your batch. Your custom templates are saved in your browser's local storage.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto p-1">
-                        {imageTemplates.map((template) => {
+                        {[...customTemplates, ...imageTemplates].map((template) => {
                             const isSelected = selectedTemplates.includes(template.json);
                             return (
                                 <div 
@@ -1355,12 +1406,3 @@ export function BatchEditor() {
         </div>
     );
 }
-
-    
-
-    
-
-    
-
-
-    

@@ -1,6 +1,4 @@
 
-
-
 export const imageTemplates = [
   {
     name: 'News Headline',
@@ -23,7 +21,7 @@ export const imageTemplates = [
             "fontFamily": "'Inter', sans-serif",
             "addTextBackground": true,
             "textBackgroundColor": "rgba(0, 0, 0, 0.7)",
-            "layout": { "position": "center-bottom" }
+            "layout": { "position": "center" }
           }
         ],
         "width": 1280,
@@ -364,3 +362,5 @@ export function deleteCustomTemplate(name: string) {
     console.error("Failed to delete custom template from localStorage", e);
   }
 }
+
+    

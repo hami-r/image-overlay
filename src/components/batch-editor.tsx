@@ -458,7 +458,8 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
             const getWrappedLines = (layer: any) => {
                 const { text = "", fontSize = 64, fontFamily = "'Inter', sans-serif" } = layer;
                 ctx.font = `${fontSize}px ${fontFamily}`;
-                const maxWidth = width - (width * 0.2); // 10% margin on each side
+                const hMargin = width * 0.15;
+                const maxWidth = width - (hMargin * 2);
                 
                 const manualLines = text.split('\n');
                 let wrappedLines: string[] = [];
@@ -583,20 +584,17 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     const hPos = layer.layout.position.split('-')[1] || (layer.layout.position === 'center' ? 'center' : 'center');
 
                     let x;
-                    const hMargin = width * 0.1;
+                    const hMargin = width * 0.15;
                     
                     if (hPos === 'left') {
-                        ctx.textAlign = 'left';
                         x = hMargin;
                     } else if (hPos === 'right') {
-                        ctx.textAlign = 'right';
                         x = width - hMargin;
                     } else { // center
-                        ctx.textAlign = 'center';
                         x = width / 2;
                     }
                     
-                    drawTextLayer(layer, x, layerCenterY);
+                    drawTextLayer({...layer, textAlign: hPos}, x, layerCenterY);
 
                     currentY += layerHeight;
                 });

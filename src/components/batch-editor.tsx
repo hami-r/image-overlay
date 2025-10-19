@@ -583,11 +583,12 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     let x;
                     const hMargin = width * 0.05;
 
+                    ctx.textAlign = hPos as CanvasTextAlign;
+
                     if (hPos === 'left') x = hMargin;
                     else if (hPos === 'right') x = width - hMargin;
                     else x = width / 2;
                     
-                    ctx.textAlign = hPos as CanvasTextAlign;
 
                     drawTextLayer(layer, x, layerCenterY);
 

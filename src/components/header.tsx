@@ -1,5 +1,6 @@
+
 import Link from 'next/link';
-import { Code, Image as ImageIcon } from 'lucide-react';
+import { Code, Image as ImageIcon, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function Header() {
@@ -11,6 +12,12 @@ export function Header() {
           <h1 className="text-xl font-bold">Image Overlay Studio</h1>
         </Link>
         <div className="flex items-center gap-4">
+           <Link href="/templates" passHref>
+            <Button variant="ghost">
+              <Library className="mr-2 h-4 w-4" />
+              Template Library
+            </Button>
+          </Link>
            <Link href="/batch" passHref>
             <Button variant="outline">
               <Code className="mr-2" />

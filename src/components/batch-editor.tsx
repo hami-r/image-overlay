@@ -1,5 +1,6 @@
 
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -1259,7 +1260,7 @@ export function BatchEditor() {
                     </Button>
                 </div>
                  <div className="space-y-2 self-center">
-                     <p className="text-sm font-medium text-muted-foreground text-center">Or start with a template:</p>
+                    <p className="text-sm font-medium text-muted-foreground text-center">Or start with a template:</p>
                     <Button variant="outline" onClick={() => setTemplateDialogOpen(true)} className="w-full">
                         <PlusCircle className="mr-2 h-4 w-4" /> Add from Template Library
                     </Button>

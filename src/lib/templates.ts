@@ -1,5 +1,6 @@
 
 
+
 export const imageTemplates = [
   {
     name: 'News Headline',
@@ -348,5 +349,18 @@ export function saveCustomTemplate(template: CustomTemplate) {
     window.localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(templates));
   } catch (e) {
     console.error("Failed to save custom template to localStorage", e);
+  }
+}
+
+export function deleteCustomTemplate(name: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const templates = getCustomTemplates();
+  const updatedTemplates = templates.filter(t => t.name !== name);
+  try {
+    window.localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(updatedTemplates));
+  } catch (e) {
+    console.error("Failed to delete custom template from localStorage", e);
   }
 }

@@ -92,6 +92,18 @@ const URLBackgroundInput = ({ index, onSetUrl }: { index: number, onSetUrl: (url
     )
 }
 
+const positionOptions = [
+    { value: 'top-left', label: 'Top Left' },
+    { value: 'top-center', label: 'Top Center' },
+    { value: 'top-right', label: 'Top Right' },
+    { value: 'center-left', label: 'Center Left' },
+    { value: 'center', label: 'Center' },
+    { value: 'center-right', label: 'Center Right' },
+    { value: 'bottom-left', label: 'Bottom Left' },
+    { value: 'bottom-center', label: 'Bottom Center' },
+    { value: 'bottom-right', label: 'Bottom Right' },
+];
+
 const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground, onImageUpload, onImageUrl, onAiGenerateImage, generatingAiImageIndex, onApplyStylesToAll }: { 
     config: any, 
     index: number, 
@@ -115,6 +127,7 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
             fontSize: 64,
             fontFamily: "'Inter', sans-serif",
             textAlign: 'center',
+            layout: { position: 'center' },
             x: undefined,
             y: undefined,
         };
@@ -127,6 +140,36 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
         }
     }
 
+    const handlePositioningModeChange = (layerId: number, mode: 'auto' | 'manual') => {
+        const newLayers = config.textLayers.map((l: any) => {
+            if (l.id === layerId) {
+                const newLayer = {...l};
+                if (mode === 'auto') {
+                    newLayer.layout = { position: newLayer.layout?.position || 'center' };
+                    delete newLayer.x;
+                    delete newLayer.y;
+                } else { // manual
+                    delete newLayer.layout;
+                    newLayer.x = l.x ?? config.width / 2;
+                    newLayer.y = l.y ?? config.height / 2;
+                }
+                return newLayer;
+            }
+            return l;
+        });
+        onConfigChange('textLayers', newLayers);
+    }
+    
+    const handleLayoutPositionChange = (layerId: number, position: string) => {
+        const newLayers = config.textLayers.map((l: any) => {
+            if (l.id === layerId) {
+                return {...l, layout: { position }};
+            }
+            return l;
+        });
+        onConfigChange('textLayers', newLayers);
+    }
+
     return (
         <AccordionItem value={`item-${index}`}>
             <AccordionTrigger>
@@ -135,7 +178,9 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
             <AccordionContent>
                 <div className="space-y-4 p-4 pr-2">
                     <Accordion type="multiple" defaultValue={[`layer-0`]} className="w-full">
-                        {textLayers.map((layer: any, layerIndex: number) => (
+                        {textLayers.map((layer: any, layerIndex: number) => {
+                           const positioningMode = layer.layout?.position ? 'auto' : 'manual';
+                           return (
                            <AccordionItem key={layer.id || layerIndex} value={`layer-${layerIndex}`}>
                                 <AccordionTrigger>Layer {layerIndex + 1}: {layer.text}</AccordionTrigger>
                                 <AccordionContent className="space-y-4 pt-4">
@@ -158,16 +203,39 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor={`layer-x-${index}-${layerIndex}`}>Position X</Label>
-                                            <Input id={`layer-x-${index}-${layerIndex}`} type="number" placeholder={`${config.width/2 || 640}`} value={layer.x ?? ''} onChange={(e) => onConfigChange('x', e.target.value, layer.id)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor={`layer-y-${index}-${layerIndex}`}>Position Y</Label>
-                                            <Input id={`layer-y-${index}-${layerIndex}`} type="number" placeholder={`${config.height/2 || 360}`} value={layer.y ?? ''} onChange={(e) => onConfigChange('y', e.target.value, layer.id)} />
-                                        </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Positioning</Label>
+                                        <ToggleGroup type="single" value={positioningMode} onValueChange={(mode: 'auto' | 'manual') => mode && handlePositioningModeChange(layer.id, mode)} className="w-full">
+                                            <ToggleGroupItem value="auto" className="w-full">Auto</ToggleGroupItem>
+                                            <ToggleGroupItem value="manual" className="w-full">Manual</ToggleGroupItem>
+                                        </ToggleGroup>
                                     </div>
+
+                                    {positioningMode === 'auto' ? (
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`layer-position-${index}-${layer.id}`}>Position</Label>
+                                            <Select value={layer.layout?.position} onValueChange={(v) => handleLayoutPositionChange(layer.id, v)}>
+                                                <SelectTrigger id={`layer-position-${index}-${layer.id}`}><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {positionOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor={`layer-x-${index}-${layerIndex}`}>Position X</Label>
+                                                <Input id={`layer-x-${index}-${layerIndex}`} type="number" placeholder={`${config.width/2 || 640}`} value={layer.x ?? ''} onChange={(e) => onConfigChange('x', e.target.value, layer.id)} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor={`layer-y-${index}-${layerIndex}`}>Position Y</Label>
+                                                <Input id={`layer-y-${index}-${layerIndex}`} type="number" placeholder={`${config.height/2 || 360}`} value={layer.y ?? ''} onChange={(e) => onConfigChange('y', e.target.value, layer.id)} />
+                                            </div>
+                                        </div>
+                                    )}
+
+
                                     <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                             <Label htmlFor={`font-size-${index}-${layerIndex}`}>Font Size</Label>
@@ -254,7 +322,7 @@ const BatchItem = ({ config, index, onConfigChange, onRemove, onRandomBackground
                                     <Button variant="outline" size="sm" onClick={() => removeLayer(layer.id)}><Trash2 className="h-4 w-4 mr-2"/> Remove Layer</Button>
                                 </AccordionContent>
                            </AccordionItem>
-                        ))}
+                        )})}
                     </Accordion>
                     <Button variant="outline" onClick={addLayer}><PlusCircle className="h-4 w-4 mr-2"/> Add Text Layer</Button>
                     
@@ -345,7 +413,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
         canvas.style.width = '100%';
         canvas.style.height = '100%';
 
-        const drawBackground = new Promise<void>((bgResolve, bgReject) => {
+        const drawBackground = new Promise<void>((bgResolve) => {
             if (backgroundImage) {
                 const img = new Image();
                 img.crossOrigin = "anonymous";
@@ -354,7 +422,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     bgResolve();
                 };
                 img.onerror = () => {
-                    bgReject(new Error(`Failed to load image from ${backgroundImage.substring(0,100)}... Check URL and CORS policy.`));
+                    reject(new Error(`Failed to load image from ${backgroundImage.substring(0,100)}... Check URL and CORS policy.`));
                 };
                 img.src = backgroundImage;
             } else {
@@ -386,59 +454,52 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
         });
 
         drawBackground.then(() => {
-            const autoPositionedLayers = textLayers.filter((l: any) => l.x === undefined || l.y === undefined);
-            const manualPositionedLayers = textLayers.filter((l: any) => l.x !== undefined && l.y !== undefined);
-
-            const allLayersToDraw = [...autoPositionedLayers, ...manualPositionedLayers];
+            const autoPositionedLayers = textLayers.filter((l: any) => !l.layout?.position);
+            const manualPositionedLayers = textLayers.filter((l: any) => l.x !== undefined && l.y !== undefined && !l.layout?.position);
+            const smartPositionedLayers = textLayers.filter((l: any) => l.layout?.position);
 
             let autoY = 0;
             const autoLayerHeights: { [id: number]: number } = {};
             
-            // First pass: calculate heights for auto-positioned layers
-            allLayersToDraw.forEach((layer: any) => {
-                 const { text = "", fontSize = 64, fontFamily = "'Inter', sans-serif" } = layer;
-                const isAuto = layer.x === undefined || layer.y === undefined;
+            // Pass 1: Calculate heights for auto-positioned layers
+            autoPositionedLayers.forEach((layer: any) => {
+                const { text = "", fontSize = 64, fontFamily = "'Inter', sans-serif" } = layer;
+                ctx.font = `${fontSize}px ${fontFamily}`;
+                const lineHeight = fontSize * 1.2;
+                const maxWidth = width - (width * 0.1);
 
-                if (isAuto) {
-                    ctx.font = `${fontSize}px ${fontFamily}`;
-                    const lineHeight = fontSize * 1.2;
-                    const textPadding = width * 0.1; // 10% padding
-                    const maxWidth = width - textPadding;
-
-                    const manualLines = text.split('\n');
-                    let wrappedLines: string[] = [];
-
-                    manualLines.forEach(line => {
-                        let currentLine = '';
-                        const words = line.split(' ');
-                        for (const word of words) {
-                            const testLine = currentLine + word + ' ';
-                            const metrics = ctx.measureText(testLine);
-                            if (metrics.width > maxWidth && currentLine.length > 0) {
-                                wrappedLines.push(currentLine.trim());
-                                currentLine = word + ' ';
-                            } else {
-                                currentLine = testLine;
-                            }
+                const manualLines = text.split('\n');
+                let wrappedLines: string[] = [];
+                manualLines.forEach(line => {
+                    let currentLine = '';
+                    const words = line.split(' ');
+                    for (const word of words) {
+                        const testLine = currentLine + word + ' ';
+                        if (ctx.measureText(testLine).width > maxWidth && currentLine.length > 0) {
+                            wrappedLines.push(currentLine.trim());
+                            currentLine = word + ' ';
+                        } else {
+                            currentLine = testLine;
                         }
-                        wrappedLines.push(currentLine.trim());
-                    });
-                    
-                    const totalLayerHeight = wrappedLines.length * lineHeight;
-                    autoLayerHeights[layer.id] = totalLayerHeight;
-                    autoY += totalLayerHeight + (fontSize * 0.5); // Padding
-                }
+                    }
+                    wrappedLines.push(currentLine.trim());
+                });
+                
+                const totalLayerHeight = wrappedLines.length * lineHeight;
+                autoLayerHeights[layer.id] = totalLayerHeight;
+                autoY += totalLayerHeight + (fontSize * 0.5); // Padding
             });
 
             if (Object.keys(autoLayerHeights).length > 0) {
                 const firstLayerId = Object.keys(autoLayerHeights)[0];
-                const firstLayer = allLayersToDraw.find(l => l.id === parseInt(firstLayerId));
+                const firstLayer = textLayers.find((l:any) => l.id === parseInt(firstLayerId));
                 autoY -= (firstLayer?.fontSize || 0) * 0.5; // No padding before first item
             }
             
             let currentY = (height - autoY) / 2;
+            const layersToDraw = [...autoPositionedLayers, ...manualPositionedLayers, ...smartPositionedLayers];
 
-            allLayersToDraw.forEach((layer: any) => {
+            layersToDraw.forEach((layer: any) => {
                 const {
                     text = "", textColor = '#000000', fontSize = 64, fontFamily = "'Inter', sans-serif",
                     textAlign = 'center', letterSpacing = 0, addTextShadow = false,
@@ -447,9 +508,6 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     textStrokeColor = '#000000', addTextBackground = false, textBackgroundColor = 'rgba(0,0,0,0.5)',
                 } = layer;
 
-                let x, y;
-                const isAuto = layer.x === undefined || layer.y === undefined;
-                
                 ctx.font = `${fontSize}px ${fontFamily}`;
                 ctx.fillStyle = textColor;
                 ctx.textAlign = textAlign as CanvasTextAlign;
@@ -465,19 +523,16 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                 }
                 
                 const lineHeight = fontSize * 1.2;
-                const textPadding = width * 0.1; // 10% padding
-                const maxWidth = width - textPadding;
+                const maxWidth = width - (width * 0.1);
 
                 const manualLines = text.split('\n');
                 let wrappedLines: string[] = [];
-
                 manualLines.forEach(line => {
                     let currentLine = '';
                     const words = line.split(' ');
                     for (const word of words) {
                         const testLine = currentLine + word + ' ';
-                        const metrics = ctx.measureText(testLine);
-                        if (metrics.width > maxWidth && currentLine.length > 0) {
+                        if (ctx.measureText(testLine).width > maxWidth && currentLine.length > 0) {
                             wrappedLines.push(currentLine.trim());
                             currentLine = word + ' ';
                         } else {
@@ -489,41 +544,57 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
 
                 const totalLayerHeight = wrappedLines.length * lineHeight;
                 
-                if (isAuto) {
+                let x, y;
+                if (layer.layout?.position) {
+                    const margin = width * 0.05; // 5% margin
+                    const [yPos, xPos] = layer.layout.position.split('-');
+                    
+                    // Y position
+                    if (yPos === 'top') y = margin + totalLayerHeight / 2;
+                    else if (yPos === 'bottom') y = height - margin - totalLayerHeight / 2;
+                    else y = height / 2;
+
+                    // X position
+                    if (xPos === 'left') x = margin;
+                    else if (xPos === 'right') x = width - margin;
+                    else x = width / 2;
+
+                    ctx.textAlign = xPos as CanvasTextAlign;
+
+                } else if (layer.x !== undefined && layer.y !== undefined) {
+                    x = layer.x;
+                    y = layer.y;
+                } else { // Auto-stacking logic for layers without any position info
                     x = width / 2;
                     y = currentY + (autoLayerHeights[layer.id] / 2);
                     currentY += autoLayerHeights[layer.id] + (fontSize * 0.5);
-                } else {
-                    x = layer.x!;
-                    y = layer.y!;
                 }
                 
-                let startY = y - totalLayerHeight / 2;
+                let startY = y - (totalLayerHeight / 2);
                 
                 wrappedLines.forEach((line: string, lineIndex: number) => {
-                    const currentLineY = startY + lineIndex * lineHeight + lineHeight / 2;
+                    const currentLineY = startY + (lineIndex * lineHeight) + (lineHeight / 2);
                     
                     if (addTextBackground) {
                         const textMetrics = ctx.measureText(line);
-                        const textWidth = textMetrics.width;
                         const bgPadding = fontSize / 4;
-                        const currentShadow = ctx.shadowColor;
+                        let textWidth = textMetrics.width;
+
+                        // Save and reset shadow for background drawing
+                        const currentShadow = { c: ctx.shadowColor, b: ctx.shadowBlur, x: ctx.shadowOffsetX, y: ctx.shadowOffsetY };
                         ctx.shadowColor = 'transparent';
                         ctx.fillStyle = textBackgroundColor;
 
                         let rectX;
-                        if (textAlign === 'left') {
-                            rectX = x - bgPadding;
-                        } else if (textAlign === 'right') {
-                            rectX = x - textWidth - bgPadding;
-                        } else {
-                            rectX = x - textWidth / 2 - bgPadding;
-                        }
+                        if (ctx.textAlign === 'left') rectX = x - bgPadding;
+                        else if (ctx.textAlign === 'right') rectX = x - textWidth - bgPadding;
+                        else rectX = x - textWidth / 2 - bgPadding;
                         
                         const rectY = currentLineY - (lineHeight/2) - bgPadding/2;
                         ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
                         
-                        ctx.shadowColor = currentShadow;
+                        // Restore shadow and text color
+                        ctx.shadowColor = currentShadow.c; ctx.shadowBlur = currentShadow.b; ctx.shadowOffsetX = currentShadow.x; ctx.shadowOffsetY = currentShadow.y;
                         ctx.fillStyle = textColor;
                     }
 
@@ -618,6 +689,7 @@ export function BatchEditor() {
              const newJson = JSON.stringify(configs, (key, value) => {
                 if (key === 'id') return undefined;
                 if (value === undefined) return undefined; // Omit undefined values
+                if (key === 'layout' && value && Object.keys(value).length === 0) return undefined;
                 return value;
              }, 2);
              if (newJson !== jsonInput) {
@@ -748,13 +820,19 @@ export function BatchEditor() {
                             newLayer[field] = value === '' ? undefined : Number(value);
                         } else if (["x", "y"].includes(field)) {
                             newLayer[field] = value === '' ? undefined : Number(value);
-                        } else {
+                        } else if (field === 'textLayers') { // Whole array replacement
+                            return value;
+                        }
+                        else {
                             newLayer[field] = value;
                         }
                         return newLayer;
                     }
                     return l;
                 });
+                if (field === 'textLayers') {
+                    newConfig.textLayers = value;
+                }
             } else {
                 if (["width", "height"].includes(field)) {
                     newConfig[field] = value === '' ? undefined : Number(value);
@@ -885,7 +963,8 @@ export function BatchEditor() {
                     "textColor": "#000000",
                     "fontSize": 64,
                     "fontFamily": "'Inter', sans-serif",
-                    "textAlign": "center"
+                    "textAlign": "center",
+                    "layout": { "position": "center" }
                 }],
                 "background": "#FFFFFF",
                 "width": 1280,
@@ -1280,5 +1359,8 @@ export function BatchEditor() {
     
 
     
+
+    
+
 
     

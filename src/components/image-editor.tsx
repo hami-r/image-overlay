@@ -29,6 +29,7 @@ const defaultTextLayer = {
   fontSize: 64,
   fontFamily: fontFamilies[0].family,
   textAlign: 'center' as 'left' | 'center' | 'right',
+  layout: { position: 'center' },
   x: undefined,
   y: undefined,
   letterSpacing: 0,
@@ -42,6 +43,19 @@ const defaultTextLayer = {
   addTextBackground: false,
   textBackgroundColor: 'rgba(0, 0, 0, 0.5)',
 };
+
+const positionOptions = [
+    { value: 'top-left', label: 'Top Left' },
+    { value: 'top-center', label: 'Top Center' },
+    { value: 'top-right', label: 'Top Right' },
+    { value: 'center-left', label: 'Center Left' },
+    { value: 'center', label: 'Center' },
+    { value: 'center-right', label: 'Center Right' },
+    { value: 'bottom-left', label: 'Bottom Left' },
+    { value: 'bottom-center', label: 'Bottom Center' },
+    { value: 'bottom-right', label: 'Bottom Right' },
+];
+
 
 const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
     return new Promise<void>((resolve, reject) => {
@@ -64,7 +78,7 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
         canvas.style.width = '100%';
         canvas.style.height = '100%';
 
-        const drawBackground = new Promise<void>((bgResolve, bgReject) => {
+        const drawBackground = new Promise<void>((bgResolve) => {
             if (backgroundImage) {
                 const img = new Image();
                 img.crossOrigin = "anonymous";
@@ -105,59 +119,52 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
         });
 
         drawBackground.then(() => {
-            const autoPositionedLayers = textLayers.filter((l: any) => l.x === undefined || l.y === undefined);
-            const manualPositionedLayers = textLayers.filter((l: any) => l.x !== undefined && l.y !== undefined);
-
-            const allLayersToDraw = [...autoPositionedLayers, ...manualPositionedLayers];
+            const autoPositionedLayers = textLayers.filter((l: any) => !l.layout?.position);
+            const manualPositionedLayers = textLayers.filter((l: any) => l.x !== undefined && l.y !== undefined && !l.layout?.position);
+            const smartPositionedLayers = textLayers.filter((l: any) => l.layout?.position);
 
             let autoY = 0;
             const autoLayerHeights: { [id: number]: number } = {};
             
-            // First pass: calculate heights for auto-positioned layers
-            allLayersToDraw.forEach((layer: any) => {
-                 const { text = "", fontSize = 64, fontFamily = "'Inter', sans-serif" } = layer;
-                const isAuto = layer.x === undefined || layer.y === undefined;
+            // Pass 1: Calculate heights for auto-positioned layers
+            autoPositionedLayers.forEach((layer: any) => {
+                const { text = "", fontSize = 64, fontFamily = "'Inter', sans-serif" } = layer;
+                ctx.font = `${fontSize}px ${fontFamily}`;
+                const lineHeight = fontSize * 1.2;
+                const maxWidth = width - (width * 0.1);
 
-                if (isAuto) {
-                    ctx.font = `${fontSize}px ${fontFamily}`;
-                    const lineHeight = fontSize * 1.2;
-                    const textPadding = width * 0.1; // 10% padding
-                    const maxWidth = width - textPadding;
-
-                    const manualLines = text.split('\n');
-                    let wrappedLines: string[] = [];
-
-                    manualLines.forEach(line => {
-                        let currentLine = '';
-                        const words = line.split(' ');
-                        for (const word of words) {
-                            const testLine = currentLine + word + ' ';
-                            const metrics = ctx.measureText(testLine);
-                            if (metrics.width > maxWidth && currentLine.length > 0) {
-                                wrappedLines.push(currentLine.trim());
-                                currentLine = word + ' ';
-                            } else {
-                                currentLine = testLine;
-                            }
+                const manualLines = text.split('\n');
+                let wrappedLines: string[] = [];
+                manualLines.forEach(line => {
+                    let currentLine = '';
+                    const words = line.split(' ');
+                    for (const word of words) {
+                        const testLine = currentLine + word + ' ';
+                        if (ctx.measureText(testLine).width > maxWidth && currentLine.length > 0) {
+                            wrappedLines.push(currentLine.trim());
+                            currentLine = word + ' ';
+                        } else {
+                            currentLine = testLine;
                         }
-                        wrappedLines.push(currentLine.trim());
-                    });
-                    
-                    const totalLayerHeight = wrappedLines.length * lineHeight;
-                    autoLayerHeights[layer.id] = totalLayerHeight;
-                    autoY += totalLayerHeight + (fontSize * 0.5); // Padding
-                }
+                    }
+                    wrappedLines.push(currentLine.trim());
+                });
+                
+                const totalLayerHeight = wrappedLines.length * lineHeight;
+                autoLayerHeights[layer.id] = totalLayerHeight;
+                autoY += totalLayerHeight + (fontSize * 0.5); // Padding
             });
 
             if (Object.keys(autoLayerHeights).length > 0) {
                 const firstLayerId = Object.keys(autoLayerHeights)[0];
-                const firstLayer = allLayersToDraw.find(l => l.id === parseInt(firstLayerId));
+                const firstLayer = textLayers.find((l:any) => l.id === parseInt(firstLayerId));
                 autoY -= (firstLayer?.fontSize || 0) * 0.5; // No padding before first item
             }
             
             let currentY = (height - autoY) / 2;
+            const layersToDraw = [...autoPositionedLayers, ...manualPositionedLayers, ...smartPositionedLayers];
 
-            allLayersToDraw.forEach((layer: any) => {
+            layersToDraw.forEach((layer: any) => {
                 const {
                     text = "", textColor = '#000000', fontSize = 64, fontFamily = "'Inter', sans-serif",
                     textAlign = 'center', letterSpacing = 0, addTextShadow = false,
@@ -166,9 +173,6 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                     textStrokeColor = '#000000', addTextBackground = false, textBackgroundColor = 'rgba(0,0,0,0.5)',
                 } = layer;
 
-                let x, y;
-                const isAuto = layer.x === undefined || layer.y === undefined;
-                
                 ctx.font = `${fontSize}px ${fontFamily}`;
                 ctx.fillStyle = textColor;
                 ctx.textAlign = textAlign as CanvasTextAlign;
@@ -184,19 +188,16 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
                 }
                 
                 const lineHeight = fontSize * 1.2;
-                const textPadding = width * 0.1; // 10% padding
-                const maxWidth = width - textPadding;
+                const maxWidth = width - (width * 0.1);
 
                 const manualLines = text.split('\n');
                 let wrappedLines: string[] = [];
-
                 manualLines.forEach(line => {
                     let currentLine = '';
                     const words = line.split(' ');
                     for (const word of words) {
                         const testLine = currentLine + word + ' ';
-                        const metrics = ctx.measureText(testLine);
-                        if (metrics.width > maxWidth && currentLine.length > 0) {
+                        if (ctx.measureText(testLine).width > maxWidth && currentLine.length > 0) {
                             wrappedLines.push(currentLine.trim());
                             currentLine = word + ' ';
                         } else {
@@ -208,37 +209,57 @@ const drawOnCanvas = (canvas: HTMLCanvasElement, config: any) => {
 
                 const totalLayerHeight = wrappedLines.length * lineHeight;
                 
-                if (isAuto) {
+                let x, y;
+                if (layer.layout?.position) {
+                    const margin = width * 0.05; // 5% margin
+                    const [yPos, xPos] = layer.layout.position.split('-');
+                    
+                    // Y position
+                    if (yPos === 'top') y = margin + totalLayerHeight / 2;
+                    else if (yPos === 'bottom') y = height - margin - totalLayerHeight / 2;
+                    else y = height / 2;
+
+                    // X position
+                    if (xPos === 'left') x = margin;
+                    else if (xPos === 'right') x = width - margin;
+                    else x = width / 2;
+
+                    ctx.textAlign = xPos as CanvasTextAlign;
+
+                } else if (layer.x !== undefined && layer.y !== undefined) {
+                    x = layer.x;
+                    y = layer.y;
+                } else { // Auto-stacking logic for layers without any position info
                     x = width / 2;
                     y = currentY + (autoLayerHeights[layer.id] / 2);
                     currentY += autoLayerHeights[layer.id] + (fontSize * 0.5);
-                } else {
-                    x = layer.x!;
-                    y = layer.y!;
                 }
                 
-                let startY = y - totalLayerHeight / 2;
+                let startY = y - (totalLayerHeight / 2);
                 
                 wrappedLines.forEach((line: string, lineIndex: number) => {
-                    const currentLineY = startY + lineIndex * lineHeight + lineHeight / 2;
+                    const currentLineY = startY + (lineIndex * lineHeight) + (lineHeight / 2);
                     
                     if (addTextBackground) {
                         const textMetrics = ctx.measureText(line);
-                        const textWidth = textMetrics.width;
                         const bgPadding = fontSize / 4;
-                        const currentShadow = ctx.shadowColor;
+                        let textWidth = textMetrics.width;
+
+                        // Save and reset shadow for background drawing
+                        const currentShadow = { c: ctx.shadowColor, b: ctx.shadowBlur, x: ctx.shadowOffsetX, y: ctx.shadowOffsetY };
                         ctx.shadowColor = 'transparent';
                         ctx.fillStyle = textBackgroundColor;
 
                         let rectX;
-                        if (textAlign === 'left') rectX = x - bgPadding;
-                        else if (textAlign === 'right') rectX = x - textWidth - bgPadding;
+                        if (ctx.textAlign === 'left') rectX = x - bgPadding;
+                        else if (ctx.textAlign === 'right') rectX = x - textWidth - bgPadding;
                         else rectX = x - textWidth / 2 - bgPadding;
                         
                         const rectY = currentLineY - (lineHeight/2) - bgPadding/2;
                         ctx.fillRect(rectX, rectY, textWidth + bgPadding * 2, lineHeight + bgPadding);
                         
-                        ctx.shadowColor = currentShadow;
+                        // Restore shadow and text color
+                        ctx.shadowColor = currentShadow.c; ctx.shadowBlur = currentShadow.b; ctx.shadowOffsetX = currentShadow.x; ctx.shadowOffsetY = currentShadow.y;
                         ctx.fillStyle = textColor;
                     }
 
@@ -304,6 +325,34 @@ export function ImageEditor() {
       return layer;
     }));
   };
+
+  const handlePositioningModeChange = (id: number, mode: 'auto' | 'manual') => {
+      setTextLayers(layers => layers.map(layer => {
+          if (layer.id === id) {
+              const newLayer = {...layer};
+              if (mode === 'auto') {
+                  newLayer.layout = { position: newLayer.layout?.position || 'center' };
+                  delete newLayer.x;
+                  delete newLayer.y;
+              } else { // manual
+                  delete newLayer.layout;
+                  newLayer.x = newLayer.x ?? previewDim.width / 2;
+                  newLayer.y = newLayer.y ?? previewDim.height / 2;
+              }
+              return newLayer;
+          }
+          return layer;
+      }));
+  }
+
+  const handleLayoutPositionChange = (id: number, position: string) => {
+    setTextLayers(layers => layers.map(layer => {
+        if (layer.id === id) {
+            return {...layer, layout: { position }};
+        }
+        return layer;
+    }));
+  }
   
   const addLayer = () => {
     setTextLayers(layers => [...layers, { ...defaultTextLayer, id: Date.now(), text: "New Layer" }]);
@@ -521,7 +570,9 @@ export function ImageEditor() {
                 <AccordionTrigger>Text Layers</AccordionTrigger>
                 <AccordionContent className="space-y-4 pt-4">
                     <Accordion type="multiple" defaultValue={[`layer-${textLayers[0]?.id}`]} className="w-full">
-                     {textLayers.map((layer, index) => (
+                     {textLayers.map((layer, index) => {
+                        const positioningMode = layer.layout?.position ? 'auto' : 'manual';
+                        return (
                         <AccordionItem key={layer.id} value={`layer-${layer.id}`}>
                             <AccordionTrigger>
                                 <span className="truncate">Layer {index+1}: {layer.text}</span>
@@ -546,16 +597,36 @@ export function ImageEditor() {
                                     </Select>
                                     </div>
                                 </div>
-                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor={`layer-x-${layer.id}`}>Position X</Label>
-                                        <Input id={`layer-x-${layer.id}`} type="number" placeholder={`${previewDim.width/2}`} value={layer.x ?? ''} onChange={(e) => handleLayerChange(layer.id, 'x', e.target.value)} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor={`layer-y-${layer.id}`}>Position Y</Label>
-                                        <Input id={`layer-y-${layer.id}`} type="number" placeholder={`${previewDim.height/2}`} value={layer.y ?? ''} onChange={(e) => handleLayerChange(layer.id, 'y', e.target.value)} />
-                                    </div>
+                                 <div className="space-y-2">
+                                    <Label>Positioning</Label>
+                                    <ToggleGroup type="single" value={positioningMode} onValueChange={(mode: 'auto' | 'manual') => mode && handlePositioningModeChange(layer.id, mode)} className="w-full">
+                                        <ToggleGroupItem value="auto" className="w-full">Auto</ToggleGroupItem>
+                                        <ToggleGroupItem value="manual" className="w-full">Manual</ToggleGroupItem>
+                                    </ToggleGroup>
                                 </div>
+
+                                {positioningMode === 'auto' ? (
+                                    <div className="space-y-2">
+                                        <Label htmlFor={`layer-position-${layer.id}`}>Position</Label>
+                                        <Select value={layer.layout?.position} onValueChange={(v) => handleLayoutPositionChange(layer.id, v)}>
+                                            <SelectTrigger id={`layer-position-${layer.id}`}><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {positionOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`layer-x-${layer.id}`}>Position X</Label>
+                                            <Input id={`layer-x-${layer.id}`} type="number" placeholder={`${previewDim.width/2}`} value={layer.x ?? ''} onChange={(e) => handleLayerChange(layer.id, 'x', e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`layer-y-${layer.id}`}>Position Y</Label>
+                                            <Input id={`layer-y-${layer.id}`} type="number" placeholder={`${previewDim.height/2}`} value={layer.y ?? ''} onChange={(e) => handleLayerChange(layer.id, 'y', e.target.value)} />
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="space-y-2">
                                     <Label>Font Size: {layer.fontSize}px</Label>
                                     <Slider value={[layer.fontSize]} onValueChange={([val]) => handleLayerChange(layer.id, 'fontSize', val)} min={16} max={256} step={1} />
@@ -647,7 +718,7 @@ export function ImageEditor() {
                                 </Button>
                             </AccordionContent>
                         </AccordionItem>
-                     ))}
+                     )})}
                     </Accordion>
                      <Button variant="outline" onClick={addLayer} className="w-full">
                         <PlusCircle className="mr-2 h-4 w-4" /> Add Text Layer
@@ -762,3 +833,5 @@ export function ImageEditor() {
     </div>
   );
 }
+
+    

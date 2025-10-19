@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -46,17 +47,24 @@ const prompt = ai.definePrompt({
   output: {schema: GenerateBatchJsonOutputSchema},
   prompt: `You are an expert at creating JSON configurations for generating images.
 A user will provide a prompt, and you must generate a valid JSON array of objects based on their request.
-Each object in the array represents an image to be created and has a 'textLayers' property, which is an array of text layer objects.
-Each object in the array represents an image to be created and can have the following properties:
-- textLayers: Array of objects, where each object can have:
-  - text: string (the main text for the overlay)
-  - textColor: string (hex color code, e.g., "#FFFFFF")
-  - fontSize: number (e.g., 64)
-  - fontFamily: string (must be one of the available fonts)
-  - textAlign: 'left' | 'center' | 'right'
+Each object in the array represents an image to be created.
+
+IMAGE OBJECT PROPERTIES:
+- textLayers: Array of objects, where each object defines a text block.
 - background: string (hex color code or a CSS linear-gradient)
 - width: number (e.g., 1280)
 - height: number (e.g., 720)
+
+TEXT LAYER PROPERTIES:
+- text: string (the main text for the overlay)
+- textColor: string (hex color code, e.g., "#FFFFFF")
+- fontSize: number (e.g., 64)
+- fontFamily: string (must be one of the available fonts)
+- textAlign: 'left' | 'center' | 'right'
+- layout: object (for automatic positioning)
+  - position: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right'
+
+IMPORTANT: Use the 'layout' property for positioning. Do NOT use 'x' and 'y' coordinates. Let the system handle the exact coordinates.
 
 Available font families: ${FONT_FAMILY_NAMES}
 Default font is 'Inter'.
@@ -92,3 +100,5 @@ const generateBatchJsonFlow = ai.defineFlow(
     }
   }
 );
+
+    
